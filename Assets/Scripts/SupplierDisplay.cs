@@ -16,20 +16,19 @@ public class SupplierDisplay : MonoBehaviour
     public TextMeshProUGUI certRegistrationText;
     public TextMeshProUGUI registrationStatusText;
 
-    public void ShowSupplier(SupplierData supplier)
+    public void ShowSupplier(SupplierData supplier, string bannedOrigin = "")
     {
         if (supplier == null) return;
 
         if (supplierNameText != null) supplierNameText.text = supplier.supplierName;
         if (dialogueText != null) dialogueText.text = "「" + supplier.dialogue + "」";
         if (claimedRiceNameText != null) claimedRiceNameText.text = supplier.claimedRiceName;
-        if (priceText != null) priceText.text = "¥" + supplier.pricePerKg.ToString("N0") + " / kg";
-        if (volumeText != null) volumeText.text = supplier.volumeKg + " kg";
-
         if (certRiceNameText != null) certRiceNameText.text = supplier.certRiceName;
         if (certOriginText != null) certOriginText.text = supplier.certOrigin;
         if (certRegistrationText != null) certRegistrationText.text = supplier.certRegistrationNumber;
         if (registrationStatusText != null)
             registrationStatusText.text = supplier.registrationExpired ? "期限切れ" : "有効";
+        if (priceText != null) priceText.text = "¥" + supplier.pricePerKg.ToString("N0") + " / kg";
+        if (volumeText != null) volumeText.text = supplier.volumeKg + " kg";
     }
 }

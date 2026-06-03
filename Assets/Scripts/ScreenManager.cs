@@ -6,10 +6,11 @@ public class ScreenManager : MonoBehaviour
     public GameObject newsScreen;
     public GameObject buyScreen;
     public GameObject nightScreen;
+    public GameObject endingScreen;
 
     void Start()
     {
-        ShowShop();
+        ShowNews();
     }
 
     public void ShowShop()
@@ -36,11 +37,18 @@ public class ScreenManager : MonoBehaviour
         if (nightScreen != null) nightScreen.SetActive(true);
     }
 
+    public void ShowEnding()
+    {
+        SetAll(false);
+        if (endingScreen != null) endingScreen.SetActive(true);
+    }
+
     void SetAll(bool active)
     {
         if (shopScreen != null) shopScreen.SetActive(active);
         if (newsScreen != null) newsScreen.SetActive(active);
         if (buyScreen != null) buyScreen.SetActive(active);
         if (nightScreen != null) nightScreen.SetActive(active);
+        if (endingScreen != null) endingScreen.SetActive(active);
     }
 }
