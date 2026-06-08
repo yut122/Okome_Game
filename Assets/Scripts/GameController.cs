@@ -5,28 +5,30 @@ using UnityEngine.UI;
 
 public class GameController : MonoBehaviour
 {
-    public JudgeManager judge;
-    public int money = 100000;
+    public JudgeManager   judge;
+    public MarketManager  market;
+    public int money      = 100000;
     public int reputation = 80;
-    public int stock = 0;
+    public int stock      = 0;
     public int currentDay = 1;
-    public int maxDays = 5;
+    public int maxDays    = 5;
     public List<SupplierData> purchasedSuppliers = new List<SupplierData>();
-    public List<SupplierData> reportedSuppliers = new List<SupplierData>();
+    public List<SupplierData> reportedSuppliers  = new List<SupplierData>();
 
     public TextMeshProUGUI moneyText;
     public TextMeshProUGUI stockText;
     public TextMeshProUGUI dayText;
     public TextMeshProUGUI resultText;
-    public TextMeshProUGUI endingText;   // EndingScreen上のテキスト
+    public TextMeshProUGUI endingText;
     public SupplierDisplay supplierDisplay;
 
-    public GameObject actionButtons;   // 仕入れ・断る・通報ボタングループ
-    public GameObject endDayButton;    // 本日終了ボタン
+    public GameObject actionButtons;
+    public GameObject endDayButton;
     public ScreenManager screenManager;
 
     void Start()
     {
+        market.GenerateDailyMarket();
         UpdateUI();
         ShowCurrentSupplier();
         if (endDayButton != null) endDayButton.SetActive(false);
@@ -53,11 +55,13 @@ public class GameController : MonoBehaviour
         }
     }
 
+    public void UpdateUIPublic() => UpdateUI();
+
     void UpdateUI()
     {
         if (moneyText != null) moneyText.text = "所持金：¥" + money.ToString("N0");
         if (stockText != null) stockText.text = "在庫：" + stock + "kg";
-        if (dayText != null) dayText.text = currentDay + "日目";
+        if (dayText != null)   dayText.text   = currentDay + "年目";
     }
 
     public void OnBuyButton()
@@ -83,7 +87,14 @@ public class GameController : MonoBehaviour
         AfterDecision();
     }
 
+    // 仕入れ終了 → 販売画面へ
     public void OnEndDayButton()
+    {
+        if (screenManager != null) screenManager.ShowSell();
+    }
+
+    // 販売完了 → 夜の結果へ
+    public void OnSellComplete()
     {
         ProcessNightResult();
         if (screenManager != null) screenManager.ShowNight();
@@ -99,6 +110,7 @@ public class GameController : MonoBehaviour
             return;
         }
 
+        market.GenerateDailyMarket();
         judge.ResetSuppliers();
         if (actionButtons != null) actionButtons.SetActive(true);
         if (endDayButton != null) endDayButton.SetActive(false);
@@ -115,7 +127,7 @@ public class GameController : MonoBehaviour
         {
             endingMessage =
                 "【正義の米屋】\n\n" +
-                "5日間、あなたは食の安全を守り続けました。\n\n" +
+                "5年間、あなたは食の安全を守り続けました。\n\n" +
                 "お店の評判は街中に広まり、\n" +
                 "常連客がさらに増えていきました。\n\n" +
                 "最終評判：" + reputation + "%\n" +
@@ -137,7 +149,7 @@ public class GameController : MonoBehaviour
                 "【生活優先】\n\n" +
                 "正直に生きることと、\n" +
                 "生活を守ることの間で揺れながら、\n" +
-                "あなたは5日間を乗り越えました。\n\n" +
+                "あなたは5年間を乗り越えました。\n\n" +
                 "最終評判：" + reputation + "%\n" +
                 "所持金：¥" + money.ToString("N0");
         }
@@ -148,7 +160,7 @@ public class GameController : MonoBehaviour
 
     public void ProcessNightResult()
     {
-        string nightLog = currentDay + "日目の結果\n\n";
+        string nightLog = currentDay + "年目の結果\n\n";
 
         foreach (SupplierData supplier in purchasedSuppliers)
         {
@@ -184,7 +196,7 @@ public class GameController : MonoBehaviour
         nightLog += "\n所持金：¥" + money.ToString("N0") + "　在庫：" + stock + "kg　評判：" + reputation + "%";
 
         if (currentDay >= maxDays)
-            nightLog += "\n\n「つぎへ」を押してエンディングへ";
+            nightLog += "\n\n「つぎへ」を押して結果へ";
 
         if (resultText != null) resultText.text = nightLog;
 
