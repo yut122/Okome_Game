@@ -12,12 +12,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4ed5645eb20515c4f8487e59b80d0f87, type: 3}
   m_Name: Supplier01
   m_EditorClassIdentifier: Assembly-CSharp::SupplierData
-  supplierName: "田中農場"
-  dialogue: "東部の新鮮なコシノヒカルです！自信作ですよ！"
-  claimedRiceName: "コシノヒカル"
-  pricePerKg: 2000
-  volumeKg: 20
-  certRiceName: "コシノヒカル"
-  certOrigin: "東部地区"
-  certRegistrationNumber: A-1001
+  supplierName: "\u7530\u4E2D\u8FB2\u5834"
+  dialogue: "\u3046\u3061\u306E\u7C73\u306F\u81EA\u6162\u306E\u54C1\u3067\u3059\u3002\u3069\u3046\u305E\u3088\u308D\u3057\u304F\uFF01"
+  claimedRiceName: "\u30B3\u30B7\u30CE\u30D2\u30AB\u30EB"
+  pricePerKg: 500
+  volumeKg: 30
+  certRiceName: "\u30B3\u30B7\u30CE\u30D2\u30AB\u30EB"
+  certOrigin: "\u5357\u90E8\u5730\u533A"
+  certRegistrationNumber: A-2024-001
   registrationExpired: 0

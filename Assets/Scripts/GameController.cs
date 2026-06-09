@@ -5,55 +5,197 @@ using UnityEngine.UI;
 
 public class GameController : MonoBehaviour
 {
-    public JudgeManager   judge;
-    public MarketManager  market;
+    // ── パラメータ ──────────────────────────────
+    public JudgeManager  judge;
+    public MarketManager market;
     public int money      = 100000;
-    public int reputation = 80;
     public int stock      = 0;
     public int currentDay = 1;
     public int maxDays    = 5;
+
+    // 将来フェーズ用（現在は未使用）
+    [HideInInspector] public int reputation = 80;
+
+    // 年間トラッキング
+    [HideInInspector] public int yearSellRevenue  = 0; // SellControllerが書き込む
+    int moneyAtYearStart = 0;
+
     public List<SupplierData> purchasedSuppliers = new List<SupplierData>();
     public List<SupplierData> reportedSuppliers  = new List<SupplierData>();
 
+    [Header("UI テキスト")]
     public TextMeshProUGUI moneyText;
     public TextMeshProUGUI stockText;
     public TextMeshProUGUI dayText;
-    public TextMeshProUGUI resultText;
+    public TextMeshProUGUI resultText;      // NightScreen：項目名（左）
+    public TextMeshProUGUI resultValueText; // NightScreen：金額（右揃え）
+    public TextMeshProUGUI summaryText;   // BuyScreen購入サマリー
     public TextMeshProUGUI endingText;
-    public SupplierDisplay supplierDisplay;
 
-    public GameObject actionButtons;
-    public GameObject endDayButton;
+    [Header("業者カード")]
+    public SupplierCardUI[] supplierCards;
+
+    [Header("BuyScreen ボタン")]
+    public GameObject buyButton;
+    public GameObject resetButton;
+    public GameObject sellButton;
+
+    [Header("画面")]
     public ScreenManager screenManager;
 
-    void Start()
+    // ── 内部状態 ────────────────────────────────
+    int selectedIndex = -1;
+    readonly List<(SupplierData supplier, int cost)> yearPurchases
+        = new List<(SupplierData, int)>();
+
+    // ════════════════════════════════════════════
+    // 初期化
+    // ════════════════════════════════════════════
+
+    void Start() => InitYear();
+
+    void InitYear()
     {
+        selectedIndex     = -1;
+        yearSellRevenue   = 0;
+        moneyAtYearStart  = money;
+        yearPurchases.Clear();
+
         market.GenerateDailyMarket();
         UpdateUI();
-        ShowCurrentSupplier();
-        if (endDayButton != null) endDayButton.SetActive(false);
+        RefreshCards();
+        UpdateBottomUI();
     }
 
-    void ShowCurrentSupplier()
+    // ════════════════════════════════════════════
+    // カード管理
+    // ════════════════════════════════════════════
+
+    void RefreshCards()
     {
-        if (supplierDisplay != null)
-            supplierDisplay.ShowSupplier(judge.currentSupplier, judge.bannedOrigin);
+        if (supplierCards == null) return;
+        for (int i = 0; i < supplierCards.Length; i++)
+        {
+            if (supplierCards[i] == null) continue;
+            bool active = i < judge.suppliers.Count;
+            supplierCards[i].gameObject.SetActive(active);
+            if (active) supplierCards[i].Setup(judge.suppliers[i], i, this);
+        }
     }
 
-    void AfterDecision()
+    public void OnSupplierCardSelected(int index)
     {
-        if (judge.IsLastSupplier())
+        if (index < 0 || index >= judge.suppliers.Count) return;
+        selectedIndex = index;
+        for (int i = 0; i < supplierCards.Length; i++)
+            if (supplierCards[i] != null)
+                supplierCards[i].SetSelected(i == selectedIndex);
+        UpdateBottomUI();
+    }
+
+    // ════════════════════════════════════════════
+    // ボタン処理
+    // ════════════════════════════════════════════
+
+    public void OnBuyButton()
+    {
+        if (selectedIndex < 0) return;
+        var s    = judge.suppliers[selectedIndex];
+        int cost = s.pricePerKg * s.volumeKg;
+        if (money < cost) return;
+
+        money -= cost;
+        stock += s.volumeKg;
+        purchasedSuppliers.Add(s);
+        yearPurchases.Add((s, cost));
+
+        UpdateUI();
+        UpdateBottomUI();
+    }
+
+    public void OnResetButton()
+    {
+        foreach (var p in yearPurchases)
         {
-            if (actionButtons != null) actionButtons.SetActive(false);
-            if (endDayButton != null) endDayButton.SetActive(true);
-            if (resultText != null) resultText.text = "本日の業者は全員対応しました。\n「本日終了」を押してください。";
+            money += p.cost;
+            stock -= p.supplier.volumeKg;
         }
-        else
+        purchasedSuppliers.RemoveRange(
+            purchasedSuppliers.Count - yearPurchases.Count,
+            yearPurchases.Count);
+        yearPurchases.Clear();
+
+        selectedIndex = -1;
+        foreach (var c in supplierCards)
+            if (c != null) c.SetSelected(false);
+
+        UpdateUI();
+        UpdateBottomUI();
+    }
+
+    public void OnSellButton()
+    {
+        if (screenManager != null) screenManager.ShowSell();
+    }
+
+    // ════════════════════════════════════════════
+    // UI 更新
+    // ════════════════════════════════════════════
+
+    void UpdateBottomUI()
+    {
+        bool hasSelection = selectedIndex >= 0;
+        bool hasPurchase  = yearPurchases.Count > 0;
+        bool canAfford    = false;
+
+        if (hasSelection && selectedIndex < judge.suppliers.Count)
         {
-            judge.NextSupplier();
-            ShowCurrentSupplier();
+            var s  = judge.suppliers[selectedIndex];
+            canAfford = money >= s.pricePerKg * s.volumeKg;
+        }
+
+        SetActive(buyButton,   hasSelection && canAfford);
+        SetActive(resetButton, hasPurchase);
+        SetActive(sellButton,  hasPurchase);
+
+        if (summaryText != null)
+        {
+            if (hasPurchase)
+            {
+                summaryText.gameObject.SetActive(true);
+                summaryText.text = BuildSummaryText();
+            }
+            else
+            {
+                summaryText.gameObject.SetActive(false);
+            }
         }
     }
+
+    string BuildSummaryText()
+    {
+        var dict = new Dictionary<string, (int kg, int cost)>();
+        foreach (var p in yearPurchases)
+        {
+            string key = p.supplier.claimedRiceName;
+            if (dict.ContainsKey(key))
+                dict[key] = (dict[key].kg + p.supplier.volumeKg, dict[key].cost + p.cost);
+            else
+                dict[key] = (p.supplier.volumeKg, p.cost);
+        }
+
+        int total = 0;
+        var sb = new System.Text.StringBuilder();
+        foreach (var kv in dict)
+        {
+            sb.Append(kv.Key).Append(" × ").Append(kv.Value.kg).Append("kg\n");
+            total += kv.Value.cost;
+        }
+        sb.Append("合計：¥").Append(total.ToString("N0"));
+        return sb.ToString();
+    }
+
+    static void SetActive(GameObject obj, bool v) { if (obj != null) obj.SetActive(v); }
 
     public void UpdateUIPublic() => UpdateUI();
 
@@ -61,39 +203,13 @@ public class GameController : MonoBehaviour
     {
         if (moneyText != null) moneyText.text = "所持金：¥" + money.ToString("N0");
         if (stockText != null) stockText.text = "在庫：" + stock + "kg";
-        if (dayText != null)   dayText.text   = currentDay + "年目";
+        if (dayText   != null) dayText.text   = currentDay + "年目";
     }
 
-    public void OnBuyButton()
-    {
-        stock += judge.currentSupplier.volumeKg;
-        money -= judge.currentSupplier.pricePerKg * judge.currentSupplier.volumeKg;
-        purchasedSuppliers.Add(judge.currentSupplier);
-        if (resultText != null) resultText.text = judge.currentSupplier.supplierName + " から仕入れました";
-        UpdateUI();
-        AfterDecision();
-    }
+    // ════════════════════════════════════════════
+    // 画面遷移
+    // ════════════════════════════════════════════
 
-    public void OnRefuseButton()
-    {
-        if (resultText != null) resultText.text = judge.currentSupplier.supplierName + " を断りました";
-        AfterDecision();
-    }
-
-    public void OnReportButton()
-    {
-        reportedSuppliers.Add(judge.currentSupplier);
-        if (resultText != null) resultText.text = judge.currentSupplier.supplierName + " を通報しました";
-        AfterDecision();
-    }
-
-    // 仕入れ終了 → 販売画面へ
-    public void OnEndDayButton()
-    {
-        if (screenManager != null) screenManager.ShowSell();
-    }
-
-    // 販売完了 → 夜の結果へ
     public void OnSellComplete()
     {
         ProcessNightResult();
@@ -103,103 +219,75 @@ public class GameController : MonoBehaviour
     public void OnNextDayButton()
     {
         currentDay++;
-
-        if (currentDay > maxDays)
-        {
-            ShowEnding();
-            return;
-        }
-
-        market.GenerateDailyMarket();
+        if (currentDay > maxDays) { ShowEnding(); return; }
         judge.ResetSuppliers();
-        if (actionButtons != null) actionButtons.SetActive(true);
-        if (endDayButton != null) endDayButton.SetActive(false);
-        UpdateUI();
-        ShowCurrentSupplier();
+        InitYear();
         if (screenManager != null) screenManager.ShowNews();
     }
 
+    // ════════════════════════════════════════════
+    // エンディング
+    // ════════════════════════════════════════════
+
     void ShowEnding()
     {
-        string endingMessage;
+        int totalProfit = money - 100000; // 初期資金との差
+        string trend    = totalProfit >= 0 ? "+" : "";
+        string msg =
+            "【5年間の経営結果】\n\n" +
+            "最終所持金：¥" + money.ToString("N0") + "\n" +
+            "初期資金比：" + trend + totalProfit.ToString("N0") + "円\n\n";
 
-        if (reputation >= 70)
-        {
-            endingMessage =
-                "【正義の米屋】\n\n" +
-                "5年間、あなたは食の安全を守り続けました。\n\n" +
-                "お店の評判は街中に広まり、\n" +
-                "常連客がさらに増えていきました。\n\n" +
-                "最終評判：" + reputation + "%\n" +
-                "所持金：¥" + money.ToString("N0");
-        }
-        else if (reputation < 30)
-        {
-            endingMessage =
-                "【廃業】\n\n" +
-                "偽装米の噂が広まり、\n" +
-                "お客さんが誰も来なくなりました。\n\n" +
-                "あなたのお店は静かに幕を閉じました。\n\n" +
-                "最終評判：" + reputation + "%\n" +
-                "所持金：¥" + money.ToString("N0");
-        }
+        if (money >= 200000)
+            msg += "【大成功】\nあなたは優れた米商人として街中に名を広めました。";
+        else if (money >= 100000)
+            msg += "【堅実経営】\n5年間、着実に経営を続けました。";
         else
-        {
-            endingMessage =
-                "【生活優先】\n\n" +
-                "正直に生きることと、\n" +
-                "生活を守ることの間で揺れながら、\n" +
-                "あなたは5年間を乗り越えました。\n\n" +
-                "最終評判：" + reputation + "%\n" +
-                "所持金：¥" + money.ToString("N0");
-        }
+            msg += "【苦しい経営】\n厳しい5年間でした。来年こそは。";
 
-        if (endingText != null) endingText.text = endingMessage;
+        if (endingText    != null) endingText.text = msg;
         if (screenManager != null) screenManager.ShowEnding();
     }
 
+    // ════════════════════════════════════════════
+    // 夜の結果処理
+    // ════════════════════════════════════════════
+
     public void ProcessNightResult()
     {
-        string nightLog = currentDay + "年目の結果\n\n";
+        // ── 損益計算 ──
+        int purchaseCost = 0;
+        foreach (var p in yearPurchases) purchaseCost += p.cost;
 
-        foreach (SupplierData supplier in purchasedSuppliers)
-        {
-            judge.currentSupplier = supplier;
-            string violation = judge.CheckViolation();
-            if (violation != "")
-            {
-                reputation = Mathf.Clamp(reputation - 20, 0, 100);
-                nightLog += "× " + supplier.supplierName + "：" + violation + "　評判-20\n";
-            }
-            else
-            {
-                nightLog += "○ " + supplier.supplierName + "：問題なし\n";
-            }
-        }
+        int    netProfit   = yearSellRevenue - purchaseCost;
+        string profitSign  = netProfit >= 0 ? "＋" : "−";
+        string profitLabel = netProfit >= 0 ? "今年の利益" : "今年の損失";
 
-        foreach (SupplierData supplier in reportedSuppliers)
-        {
-            judge.currentSupplier = supplier;
-            string violation = judge.CheckViolation();
-            if (violation != "")
-            {
-                reputation = Mathf.Clamp(reputation + 10, 0, 100);
-                nightLog += "○ 通報正解：" + supplier.supplierName + "　評判+10\n";
-            }
-            else
-            {
-                reputation = Mathf.Clamp(reputation - 10, 0, 100);
-                nightLog += "× 誤報：" + supplier.supplierName + "　評判-10\n";
-            }
-        }
+        // ── 左側：項目名（左揃え・タイトル後は1文字字下げ）──
+        string labels =
+            currentDay + "年目の結果\n" +
+            "\n" +
+            "　仕入れ費用\n" +
+            "　売　　上\n" +
+            "\n" +
+            "　" + profitLabel;
 
-        nightLog += "\n所持金：¥" + money.ToString("N0") + "　在庫：" + stock + "kg　評判：" + reputation + "%";
+        if (currentDay >= maxDays) labels += "\n\n「つぎへ」でエンディングへ";
 
-        if (currentDay >= maxDays)
-            nightLog += "\n\n「つぎへ」を押して結果へ";
+        // ── 右側：金額（右揃え）──
+        string values =
+            "\n" +   // タイトル行をスキップ
+            "\n" +   // 空行をスキップ
+            "-¥" + purchaseCost.ToString("N0") + "\n" +
+            "¥" + yearSellRevenue.ToString("N0") + "\n" +
+            "\n" +
+            profitSign + "¥" + Mathf.Abs(netProfit).ToString("N0");
 
-        if (resultText != null) resultText.text = nightLog;
+        if (resultText      != null) resultText.text      = labels;
+        if (resultValueText != null) resultValueText.text = values;
 
+        // リセット
+        yearPurchases.Clear();
         purchasedSuppliers.Clear();
         reportedSuppliers.Clear();
     }

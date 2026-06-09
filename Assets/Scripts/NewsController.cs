@@ -6,7 +6,8 @@ public class NewsController : MonoBehaviour
     [Header("ニュース表示")]
     public TextMeshProUGUI newsTitleText;   // ニュースのタイトル
     public TextMeshProUGUI newsBodyText;    // ニュースの本文
-    public TextMeshProUGUI pageIndicator;   // 「1/3」などのページ表示
+    public TextMeshProUGUI pageIndicator;   // 「/ 3」表示
+    public TextMeshProUGUI newsNumberText;  // ニュース番号（大きい数字）
 
     [Header("ボタン")]
     public GameObject nextButton;           // 「次のニュースへ」ボタン
@@ -49,9 +50,10 @@ public class NewsController : MonoBehaviour
                 break;
         }
 
-        if (newsTitleText != null) newsTitleText.text = title;
-        if (newsBodyText  != null) newsBodyText.text  = body;
-        if (pageIndicator != null) pageIndicator.text = (newsPage + 1) + " / 3";
+        if (newsTitleText  != null) newsTitleText.text  = title;
+        if (newsBodyText   != null) newsBodyText.text   = body;
+        if (newsNumberText != null) newsNumberText.text = (newsPage + 1).ToString();
+        if (pageIndicator  != null) pageIndicator.text  = "/ 3";
 
         // ボタン切り替え
         bool isLastPage = newsPage >= 2;
