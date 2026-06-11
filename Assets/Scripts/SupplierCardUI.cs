@@ -36,8 +36,8 @@ public class SupplierCardUI : MonoBehaviour
         if (data == null) return;
         if (supplierNameText != null) supplierNameText.text = data.supplierName;
         if (riceNameText     != null) riceNameText.text     = data.claimedRiceName;
-        if (priceText        != null) priceText.text        = "¥" + data.pricePerKg.ToString("N0") + " / kg";
-        if (volumeText       != null) volumeText.text       = data.volumeKg + " kg";
+        if (priceText        != null) priceText.text        = "¥" + data.pricePerBag.ToString("N0") + " / 袋";
+        if (volumeText       != null) volumeText.text       = data.bagCount + " 袋";
     }
 
     public void OnCardClicked()

@@ -6,8 +6,8 @@ public class SupplierData : ScriptableObject
     public string supplierName;
     public string dialogue;
     public string claimedRiceName;
-    public int pricePerKg;
-    public int volumeKg;
+    public int pricePerBag; // 1袋あたりの価格（円）
+    public int bagCount;    // 持ち込む袋数
 
     public string certRiceName;
     public string certOrigin;

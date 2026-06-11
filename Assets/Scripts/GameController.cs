@@ -8,7 +8,7 @@ public class GameController : MonoBehaviour
     // ── パラメータ ──────────────────────────────
     public JudgeManager  judge;
     public MarketManager market;
-    public int money      = 100000;
+    public int money      = 10000000;
     public int stock      = 0;
     public int currentDay = 1;
     public int maxDays    = 5;
@@ -30,6 +30,7 @@ public class GameController : MonoBehaviour
     public TextMeshProUGUI resultText;      // NightScreen：項目名（左）
     public TextMeshProUGUI resultValueText; // NightScreen：金額（右揃え）
     public TextMeshProUGUI summaryText;   // BuyScreen購入サマリー
+    public GameObject      summaryBox;    // 購入サマリーの枠（背景パネル）
     public TextMeshProUGUI endingText;
 
     [Header("業者カード")]
@@ -101,11 +102,11 @@ public class GameController : MonoBehaviour
     {
         if (selectedIndex < 0) return;
         var s    = judge.suppliers[selectedIndex];
-        int cost = s.pricePerKg * s.volumeKg;
+        int cost = s.pricePerBag; // 1回のBuyで1袋だけ仕入れる
         if (money < cost) return;
 
         money -= cost;
-        stock += s.volumeKg;
+        stock += 1;
         purchasedSuppliers.Add(s);
         yearPurchases.Add((s, cost));
 
@@ -118,7 +119,7 @@ public class GameController : MonoBehaviour
         foreach (var p in yearPurchases)
         {
             money += p.cost;
-            stock -= p.supplier.volumeKg;
+            stock -= 1;
         }
         purchasedSuppliers.RemoveRange(
             purchasedSuppliers.Count - yearPurchases.Count,
@@ -151,44 +152,34 @@ public class GameController : MonoBehaviour
         if (hasSelection && selectedIndex < judge.suppliers.Count)
         {
             var s  = judge.suppliers[selectedIndex];
-            canAfford = money >= s.pricePerKg * s.volumeKg;
+            canAfford = money >= s.pricePerBag;
         }
 
         SetActive(buyButton,   hasSelection && canAfford);
         SetActive(resetButton, hasPurchase);
-        SetActive(sellButton,  hasPurchase);
+        SetActive(sellButton,  true); // 販売ボタンはBuyScreen中つねに表示
 
-        if (summaryText != null)
-        {
-            if (hasPurchase)
-            {
-                summaryText.gameObject.SetActive(true);
-                summaryText.text = BuildSummaryText();
-            }
-            else
-            {
-                summaryText.gameObject.SetActive(false);
-            }
-        }
+        if (summaryBox != null) summaryBox.SetActive(hasPurchase);
+        if (summaryText != null && hasPurchase) summaryText.text = BuildSummaryText();
     }
 
     string BuildSummaryText()
     {
-        var dict = new Dictionary<string, (int kg, int cost)>();
+        var dict = new Dictionary<string, (int bags, int cost)>();
         foreach (var p in yearPurchases)
         {
             string key = p.supplier.claimedRiceName;
             if (dict.ContainsKey(key))
-                dict[key] = (dict[key].kg + p.supplier.volumeKg, dict[key].cost + p.cost);
+                dict[key] = (dict[key].bags + 1, dict[key].cost + p.cost);
             else
-                dict[key] = (p.supplier.volumeKg, p.cost);
+                dict[key] = (1, p.cost);
         }
 
         int total = 0;
         var sb = new System.Text.StringBuilder();
         foreach (var kv in dict)
         {
-            sb.Append(kv.Key).Append(" × ").Append(kv.Value.kg).Append("kg\n");
+            sb.Append(kv.Key).Append(" × ").Append(kv.Value.bags).Append("袋\n");
             total += kv.Value.cost;
         }
         sb.Append("合計：¥").Append(total.ToString("N0"));
@@ -202,7 +193,7 @@ public class GameController : MonoBehaviour
     void UpdateUI()
     {
         if (moneyText != null) moneyText.text = "所持金：¥" + money.ToString("N0");
-        if (stockText != null) stockText.text = "在庫：" + stock + "kg";
+        if (stockText != null) stockText.text = "在庫：" + stock + "袋";
         if (dayText   != null) dayText.text   = currentDay + "年目";
     }
 

@@ -341,10 +341,15 @@ public class OkomeUISetup : EditorWindow
             SetField(so, "newsNumberText", FindDeep("NewsNumberText")?.GetComponent<TextMeshProUGUI>());
             SetField(so, "pageIndicator",  FindDeep("PageIndicator")?.GetComponent<TextMeshProUGUI>());
             SetField(so, "nextButton",     GameObject.Find("NextNewsButton"));
-            SetField(so, "goToBuyButton",  GameObject.Find("GoToBuyButton"));
+            SetField(so, "prevButton",     FindDeep("PrevNewsButton"));
+            SetField(so, "goToBuyButton",  FindDeep("GoToBuyButton"));
+            SetField(so, "economyIconGroup", FindDeep("EconomyIconGroup"));
+            SetField(so, "opinionIconGroup", FindDeep("OpinionIconGroup"));
+            SetField(so, "harvestIconGroup", FindDeep("HarvestIconGroup"));
             SetField(so, "screenManager",  sm);
             SetField(so, "judgeManager",   jm);
             SetField(so, "marketManager",  mm);
+            SetEconomyBars(so);
             so.ApplyModifiedProperties();
             Debug.Log("✓ NewsController 配線完了");
         }
@@ -385,6 +390,7 @@ public class OkomeUISetup : EditorWindow
         WireButton("EndDayButton",    gc, "OnEndDayButton");
         WireButton("NextDayButton",   gc, "OnNextDayButton");
         WireButton("NextNewsButton",  nc, "OnNextNewsButton");
+        WireButton("PrevNewsButton",  nc, "OnPrevNewsButton");
         WireButton("GoToBuyButton",   nc, "OnGoToBuyButton");
         WireButton("SellAllButton",   sc, "OnSellAllButton");
         WireButton("SkipSellButton",  sc, "OnSkipSellButton");
@@ -404,10 +410,23 @@ public class OkomeUISetup : EditorWindow
         else Debug.LogWarning("フィールドが見つかりません: " + fieldName);
     }
 
+    // NewsControllerのeconomyBars配列（棒グラフ3本）を配線
+    static void SetEconomyBars(SerializedObject so)
+    {
+        SerializedProperty barsProp = so.FindProperty("economyBars");
+        if (barsProp == null) return;
+
+        string[] barNames = { "EconomyBar1", "EconomyBar2", "EconomyBar3" };
+        barsProp.arraySize = barNames.Length;
+        for (int i = 0; i < barNames.Length; i++)
+            barsProp.GetArrayElementAtIndex(i).objectReferenceValue = FindDeep(barNames[i])?.GetComponent<Image>();
+    }
+
     static void WireButton(string buttonName, Component target, string methodName)
     {
         if (target == null) return;
-        GameObject btnObj = GameObject.Find(buttonName);
+        // 非アクティブなボタン（PrevNewsButton/GoToBuyButtonなど）も見つけられるようFindDeepを使用
+        GameObject btnObj = FindDeep(buttonName);
         if (btnObj == null) { Debug.LogWarning("ボタンが見つかりません: " + buttonName); return; }
 
         Button btn = btnObj.GetComponent<Button>();
@@ -440,10 +459,10 @@ public class OkomeUISetup : EditorWindow
         SetSupplier("Supplier01",
             supplierName:        "田中農場",
             dialogue:            "うちの米は自慢の品です。どうぞよろしく！",
-            claimedRiceName:     "コシノヒカル",
-            pricePerKg:          500,
-            volumeKg:            30,
-            certRiceName:        "コシノヒカル",
+            claimedRiceName:     "あきたこひめ",
+            pricePerBag:         280000,
+            bagCount:            6,
+            certRiceName:        "あきたこひめ",
             certOrigin:          "南部地区",
             certRegistrationNumber: "A-2024-001",
             registrationExpired: false);
@@ -451,30 +470,30 @@ public class OkomeUISetup : EditorWindow
         SetSupplier("Supplier02",
             supplierName:        "丸山米穀",
             dialogue:            "今日は特別価格でご提供します！お得ですよ！",
-            claimedRiceName:     "コシノヒカル",
-            pricePerKg:          280,
-            volumeKg:            50,
-            certRiceName:        "コシノヒカル",
-            certOrigin:          "北部地区",
+            claimedRiceName:     "ひとめほれ",
+            pricePerBag:         200000,
+            bagCount:            10,
+            certRiceName:        "ひとめほれ",
+            certOrigin:          "西部地区",
             certRegistrationNumber: "B-2024-015",
             registrationExpired: false);
 
         SetSupplier("Supplier03",
             supplierName:        "佐藤商店",
             dialogue:            "品質には自信があります。ぜひご検討を。",
-            claimedRiceName:     "コシノヒカル",
-            pricePerKg:          420,
-            volumeKg:            40,
-            certRiceName:        "あきたこひめ",
+            claimedRiceName:     "ヤスノヒカリ",
+            pricePerBag:         140000,
+            bagCount:            12,
+            certRiceName:        "ヤスノヒカリ",
             certOrigin:          "東部地区",
             certRegistrationNumber: "C-2024-008",
             registrationExpired: false);
 
-        Debug.Log("✓ 業者データを初期設定しました。\n田中農場(正規品¥500) / 丸山米穀(産地違反¥280・格安) / 佐藤商店(品種偽装¥420)");
+        Debug.Log("✓ 業者データを初期設定しました（初期フェーズ：全業者 正規品）。\n田中農場 あきたこひめ¥280,000/袋 / 丸山米穀 ひとめほれ¥200,000/袋 / 佐藤商店 ヤスノヒカリ¥140,000/袋");
     }
 
     static void SetSupplier(string assetName, string supplierName, string dialogue,
-        string claimedRiceName, int pricePerKg, int volumeKg,
+        string claimedRiceName, int pricePerBag, int bagCount,
         string certRiceName, string certOrigin, string certRegistrationNumber, bool registrationExpired)
     {
         string[] guids = AssetDatabase.FindAssets(assetName + " t:SupplierData");
@@ -488,8 +507,8 @@ public class OkomeUISetup : EditorWindow
         data.supplierName          = supplierName;
         data.dialogue              = dialogue;
         data.claimedRiceName       = claimedRiceName;
-        data.pricePerKg            = pricePerKg;
-        data.volumeKg              = volumeKg;
+        data.pricePerBag           = pricePerBag;
+        data.bagCount              = bagCount;
         data.certRiceName          = certRiceName;
         data.certOrigin            = certOrigin;
         data.certRegistrationNumber = certRegistrationNumber;
@@ -555,11 +574,17 @@ public class OkomeUISetup : EditorWindow
         SetField(so, "newsNumberText", FindDeep("NewsNumberText")?.GetComponent<TextMeshProUGUI>());
         SetField(so, "pageIndicator",  FindDeep("PageIndicator")?.GetComponent<TextMeshProUGUI>());
         SetField(so, "nextButton",     GameObject.Find("NextNewsButton"));
-        SetField(so, "goToBuyButton",  GameObject.Find("GoToBuyButton"));
+        SetField(so, "prevButton",     FindDeep("PrevNewsButton"));
+        SetField(so, "goToBuyButton",  FindDeep("GoToBuyButton"));
+        SetField(so, "economyIconGroup", FindDeep("EconomyIconGroup"));
+        SetField(so, "opinionIconGroup", FindDeep("OpinionIconGroup"));
+        SetField(so, "harvestIconGroup", FindDeep("HarvestIconGroup"));
         SetField(so, "screenManager",  sm);
         SetField(so, "judgeManager",   jm);
         SetField(so, "marketManager",  mm);
+        SetEconomyBars(so);
         so.ApplyModifiedProperties();
+        WireButton("PrevNewsButton", nc, "OnPrevNewsButton");
         MarkDirtyAndLog("NewsController");
     }
 
@@ -610,6 +635,7 @@ public class OkomeUISetup : EditorWindow
         WireButton("EndDayButton",    gc, "OnEndDayButton");
         WireButton("NextDayButton",   gc, "OnNextDayButton");
         WireButton("NextNewsButton",  nc, "OnNextNewsButton");
+        WireButton("PrevNewsButton",  nc, "OnPrevNewsButton");
         WireButton("GoToBuyButton",   nc, "OnGoToBuyButton");
         WireButton("SellAllButton",   sc, "OnSellAllButton");
         WireButton("SkipSellButton",  sc, "OnSkipSellButton");
@@ -656,18 +682,29 @@ public class OkomeUISetup : EditorWindow
             Vector2.zero, new Vector2(870, 460),
             HexColor("#FFF8F0"));
 
-        // ③ ニュースタイトル（上部中央）
+        // ③ ニュースタイトル（左上寄せ）
         CreateText(tvScreen, "NewsTitleText",
             new Vector2(0, 175), new Vector2(800, 55),
-            "【今年の景気】", 36, HexColor("#3D2B1F"), TextAlignmentOptions.Center);
+            "【今年の景気】", 36, HexColor("#3D2B1F"), TextAlignmentOptions.Left);
 
         // ④ ニュース画像エリア（中央）
         GameObject newsImageArea = CreatePanel(tvScreen, "NewsImageArea",
             new Vector2(0, 30), new Vector2(400, 240),
             HexColor("#E8D8B0"));
-        CreateText(newsImageArea, "NewsImageLabel",
-            Vector2.zero, new Vector2(380, 50),
-            "ニュース画像", 20, HexColor("#3D2B1F"), TextAlignmentOptions.Center);
+
+        // ④-a 景気ページ：ニュースキャスター＋棒グラフ
+        GameObject economyGroup = CreateGroup(newsImageArea, "EconomyIconGroup");
+        BuildCasterIcon(economyGroup);
+
+        // ④-b 街の人の意見ページ：2人が話している様子
+        GameObject opinionGroup = CreateGroup(newsImageArea, "OpinionIconGroup");
+        BuildCitizenIcon(opinionGroup);
+        opinionGroup.SetActive(false);
+
+        // ④-c 今年の収穫ページ：田んぼに立つ農家の人
+        GameObject harvestGroup = CreateGroup(newsImageArea, "HarvestIconGroup");
+        BuildFarmerIcon(harvestGroup);
+        harvestGroup.SetActive(false);
 
         // ⑤ 本文ボックス（下部ストリップ）
         GameObject bodyBox = CreatePanel(tvScreen, "BodyBox",
@@ -692,16 +729,107 @@ public class OkomeUISetup : EditorWindow
         CreateButton(newsScreen, "NextNewsButton", "つぎ",
             new Vector2(545, 20), new Vector2(130, 65));
 
-        // ⑨「仕入れへ」ボタン（初期非表示）
+        // ⑨「仕入れへ」ボタン（最終ページのみ・「つぎ」と同じ位置に表示、初期非表示）
         GameObject goBtn = CreateButton(newsScreen, "GoToBuyButton", "仕入れへ",
-            new Vector2(545, -60), new Vector2(130, 65));
+            new Vector2(545, 20), new Vector2(130, 65));
         goBtn.SetActive(false);
+
+        // ⑩「もどる」ボタン（1ページ目では非表示）
+        GameObject prevBtn = CreateButton(newsScreen, "PrevNewsButton", "もどる",
+            new Vector2(545, -60), new Vector2(130, 65));
+        prevBtn.SetActive(false);
 
         Selection.activeGameObject = newsScreen;
         UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(
             UnityEditor.SceneManagement.EditorSceneManager.GetActiveScene());
 
         Debug.Log("✓ NewsScreenレイアウト構築完了。NewsControllerのInspectorフィールドを再設定してください。");
+    }
+
+    // ── ニュース画像エリア用：アイコングループの空コンテナを生成 ──
+    static GameObject CreateGroup(GameObject parent, string name)
+    {
+        GameObject obj = new GameObject(name, typeof(RectTransform));
+        Undo.RegisterCreatedObjectUndo(obj, "Create " + name);
+        obj.transform.SetParent(parent.transform, false);
+        RectTransform rt = obj.GetComponent<RectTransform>();
+        rt.anchoredPosition = Vector2.zero;
+        rt.sizeDelta = new Vector2(400, 240);
+        return obj;
+    }
+
+    // ── 景気ページ：ニュースキャスター＋棒グラフ ──
+    static void BuildCasterIcon(GameObject parent)
+    {
+        // ニュースキャスター（左側）
+        CreatePanel(parent, "CasterDesk", new Vector2(-130, -100), new Vector2(120, 26), HexColor("#444444"));
+        CreatePanel(parent, "CasterBody", new Vector2(-130, -52),  new Vector2(80, 70),  HexColor("#8B5E3C"));
+        CreatePanel(parent, "CasterTie",  new Vector2(-130, -40),  new Vector2(18, 40),  HexColor("#E8841A"));
+        CreatePanel(parent, "CasterHead", new Vector2(-130, 8),    new Vector2(50, 50),  HexColor("#E8C39E"));
+
+        // 棒グラフの枠（右側）
+        CreatePanel(parent, "GraphFrame",      new Vector2(60, 0), new Vector2(220, 220), HexColor("#3D2B1F"));
+        CreatePanel(parent, "GraphFrameInner", new Vector2(60, 0), new Vector2(214, 214), HexColor("#FFF8F0"));
+
+        // ベースライン（軸線）
+        CreatePanel(parent, "GraphBaseline", new Vector2(60, -90), new Vector2(196, 4), HexColor("#3D2B1F"));
+
+        // 棒グラフ本体（3本・高さと色はNewsControllerが今年の景気に合わせて変更）
+        float[] barX = { -10f, 60f, 130f };
+        string[] barNames = { "EconomyBar1", "EconomyBar2", "EconomyBar3" };
+        for (int i = 0; i < barNames.Length; i++)
+        {
+            GameObject bar = CreatePanel(parent, barNames[i],
+                new Vector2(barX[i], -90), new Vector2(50, 100), HexColor("#B0A48E"));
+            // 下端を基準に伸び縮みするようピボットを下中央に変更
+            bar.GetComponent<RectTransform>().pivot = new Vector2(0.5f, 0f);
+        }
+    }
+
+    // ── 街の人の意見ページ：2人が話している様子 ──
+    static void BuildCitizenIcon(GameObject parent)
+    {
+        // 街の人 1人目（左）
+        CreatePanel(parent, "Citizen1Body", new Vector2(-90, -50), new Vector2(80, 100), HexColor("#C9A063"));
+        CreatePanel(parent, "Citizen1Head", new Vector2(-90, 25),  new Vector2(50, 50),  HexColor("#E8C39E"));
+
+        // 街の人 2人目（右）
+        CreatePanel(parent, "Citizen2Body", new Vector2(90, -50), new Vector2(80, 100), HexColor("#7FA8C9"));
+        CreatePanel(parent, "Citizen2Head", new Vector2(90, 25),  new Vector2(50, 50),  HexColor("#E8C39E"));
+
+        // 会話の吹き出し（2人の間・上部）
+        GameObject bubble = CreatePanel(parent, "ChatBubble",
+            new Vector2(0, 75), new Vector2(110, 50), HexColor("#FFFFFF"));
+        Outline ol = bubble.AddComponent<Outline>();
+        ol.effectColor = HexColor("#3D2B1F");
+        ol.effectDistance = new Vector2(2, -2);
+
+        // 会話中を示す「・・・」のドット
+        float[] dotX = { -25f, 0f, 25f };
+        for (int i = 0; i < dotX.Length; i++)
+            CreatePanel(bubble, "Dot" + i, new Vector2(dotX[i], 0), new Vector2(14, 14), HexColor("#3D2B1F"));
+    }
+
+    // ── 今年の収穫ページ：田んぼに立つ農家の人 ──
+    static void BuildFarmerIcon(GameObject parent)
+    {
+        // 田んぼ（地面）
+        CreatePanel(parent, "Field", new Vector2(0, -95), new Vector2(400, 50), HexColor("#9CC76B"));
+
+        // 稲の株（地面から少し顔を出す程度）
+        float[] stalkX = { -150f, -110f, 120f, 160f };
+        float[] stalkH = { 40f, 46f, 42f, 48f };
+        for (int i = 0; i < stalkX.Length; i++)
+        {
+            float h = stalkH[i];
+            CreatePanel(parent, "Stalk" + i,
+                new Vector2(stalkX[i], -95f + h * 0.5f), new Vector2(6, h), HexColor("#E8C77E"));
+        }
+
+        // 農家の人（中央）
+        CreatePanel(parent, "FarmerBody", new Vector2(0, -30), new Vector2(80, 90), HexColor("#7A9A52"));
+        CreatePanel(parent, "FarmerHead", new Vector2(0, 40),  new Vector2(50, 50), HexColor("#E8C39E"));
+        CreatePanel(parent, "FarmerHat",  new Vector2(0, 73),  new Vector2(90, 16), HexColor("#D9B36A"));
     }
 
     // ===== BuyScreen レイアウト構築 =====
@@ -753,17 +881,17 @@ public class OkomeUISetup : EditorWindow
             outline.effectDistance = new Vector2(4, -4);
             border.SetActive(false);
 
-            // ヘッダー
+            // ヘッダー（お米の名前）
             CreatePanel(card, "CardHeader",
                 new Vector2(0, 143), new Vector2(310, 48), HexColor("#E8841A"));
-            CreateText(card, "SupplierNameText",
-                new Vector2(0, 143), new Vector2(300, 44),
-                "業者名", 22, Color.white, TextAlignmentOptions.Center);
-
-            // 品種名
             CreateText(card, "RiceNameText",
-                new Vector2(0, 80), new Vector2(290, 44),
-                "〇〇", 24, HexColor("#3D2B1F"), TextAlignmentOptions.Center);
+                new Vector2(0, 143), new Vector2(300, 44),
+                "〇〇", 26, Color.white, TextAlignmentOptions.Center);
+
+            // 業者名（ヘッダーの下に小さく表示）
+            CreateText(card, "SupplierNameText",
+                new Vector2(0, 84), new Vector2(290, 32),
+                "業者名", 18, HexColor("#888888"), TextAlignmentOptions.Center);
 
             CreatePanel(card, "Divider",
                 new Vector2(0, 54), new Vector2(280, 2), HexColor("#E8D0B0"));
@@ -792,10 +920,10 @@ public class OkomeUISetup : EditorWindow
         // 下段エリア（カード下部 y=-155 〜 y=-340）
         // ══════════════════════════════════════════
 
-        // 購入サマリーパネル（左寄せ、初期非表示）
-        // カード3枚幅：330×3 + 間隔20×2 = 1030 → 左端x=-515
+        // 購入サマリーパネル（「買う」ボタンの真上、初期非表示）
+        // カード下端y=-135、ボタン上端y=-265 → その中間y=-200に配置
         GameObject summaryBg = CreatePanel(buyScreen, "SummaryBg",
-            new Vector2(-270, -210), new Vector2(440, 85), HexColor("#FFF0DC"));
+            new Vector2(0, -200), new Vector2(440, 85), HexColor("#FFF0DC"));
         // パネルに薄いボーダー
         summaryBg.GetComponent<Image>().color = HexColor("#FFF0DC");
         var sumOutline = summaryBg.AddComponent<Outline>();
@@ -1246,6 +1374,7 @@ public class OkomeUISetup : EditorWindow
 
         // BuyScreen
         SetField(so, "summaryText", FindDeep("SummaryText")?.GetComponent<TextMeshProUGUI>());
+        SetField(so, "summaryBox",  FindDeep("SummaryBg"));
         SetField(so, "buyButton",   FindDeep("BuyButton"));
         SetField(so, "resetButton", FindDeep("ResetButton"));
         SetField(so, "sellButton",  FindDeep("SellButton"));

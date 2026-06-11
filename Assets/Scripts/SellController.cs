@@ -49,13 +49,13 @@ public class SellController : MonoBehaviour
     static readonly Color ColorDotNg    = new Color(0.60f, 0.60f, 0.60f, 1f);
     static readonly Color ColorDotEmpty = new Color(0.85f, 0.80f, 0.75f, 0.5f);
 
-    int   totalSoldKg  = 0;
+    int   totalSoldBags  = 0;
     int   totalRevenue = 0;
 
     // ════════════════════════════════════════════════════════
     void OnEnable()
     {
-        totalSoldKg  = 0;
+        totalSoldBags  = 0;
         totalRevenue = 0;
         gameController.yearSellRevenue = 0;
 
@@ -82,7 +82,7 @@ public class SellController : MonoBehaviour
     void UpdateRiceBagNames()
     {
         if (riceBagNameTexts == null) return;
-        string name = "コシノヒカル";
+        string name = "ヤスノヒカリ";
         if (gameController.purchasedSuppliers != null &&
             gameController.purchasedSuppliers.Count > 0)
             name = gameController.purchasedSuppliers[0].claimedRiceName;
@@ -150,26 +150,26 @@ public class SellController : MonoBehaviour
         yield return new WaitForSeconds(0.75f);
 
         // ── 購入判定 ──
-        int actualKg = Mathf.Min(Random.Range(10, 35), gameController.stock);
-        bool bought  = Random.value < buyChance && actualKg > 0;
+        int actualBags = Mathf.Min(Random.Range(1, 4), gameController.stock);
+        bool bought  = Random.value < buyChance && actualBags > 0;
 
         if (bought)
         {
-            int revenue   = actualKg * marketManager.TodaySellPrice;
-            totalSoldKg  += actualKg;
+            int revenue   = actualBags * marketManager.TodaySellPrice;
+            totalSoldBags  += actualBags;
             totalRevenue += revenue;
-            gameController.stock           -= actualKg;
+            gameController.stock           -= actualBags;
             gameController.yearSellRevenue += revenue;
             gameController.UpdateUIPublic();
 
-            if (bubbleText) bubbleText.text = "購入！　" + actualKg + "kg";
+            if (bubbleText) bubbleText.text = "購入！　" + actualBags + "袋";
             if (bubbleBg)   bubbleBg.color  = ColorBuy;
             SetDot(idx, "ok");
 
             if (runningTotalText)
                 runningTotalText.text =
                     "売上：¥" + totalRevenue.ToString("N0") +
-                    "　残在庫：" + gameController.stock + "kg";
+                    "　残在庫：" + gameController.stock + "袋";
 
             // 袋を手に持つ
             SetActive(carryBagRT?.gameObject, true);

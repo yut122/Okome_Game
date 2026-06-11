@@ -2,7 +2,7 @@ using UnityEngine;
 
 public class MarketManager : MonoBehaviour
 {
-    public int baseSellPrice = 500; // 基本売値 ¥/kg
+    public int baseSellPrice = 250000; // 基本売値 ¥/袋
 
     // 今年のパラメータ
     public string EconomyName   { get; private set; }
