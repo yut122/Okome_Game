@@ -1493,6 +1493,18 @@ public class OkomeUISetup : EditorWindow
         string folder = EditorUtility.SaveFolderPanel("WebGLビルドの出力先を選択", "", "OkomeGame_WebGL");
         if (string.IsNullOrEmpty(folder)) { Debug.Log("ビルドをキャンセルしました"); return; }
 
+        // プロジェクトのルート/Assets等を直接出力先にできないので、選んだ場合はサブフォルダを作る
+        string projectRoot = System.IO.Path.GetFullPath(
+            System.IO.Path.Combine(Application.dataPath, ".."));
+        string chosen = System.IO.Path.GetFullPath(folder);
+        if (chosen == projectRoot ||
+            chosen == System.IO.Path.GetFullPath(Application.dataPath) ||
+            chosen.StartsWith(System.IO.Path.GetFullPath(System.IO.Path.Combine(projectRoot, "Library"))))
+        {
+            folder = System.IO.Path.Combine(chosen, "WebGLBuild");
+            Debug.Log("出力先にプロジェクト直下が選ばれたため、サブフォルダ " + folder + " に出力します。");
+        }
+
         var scenes = new List<string>();
         foreach (var s in EditorBuildSettings.scenes)
             if (s.enabled) scenes.Add(s.path);
@@ -1512,6 +1524,46 @@ public class OkomeUISetup : EditorWindow
             Debug.Log("✓ WebGLビルド成功：" + folder + "\nローカルサーバで配信して index.html を開いてください。");
         else
             Debug.LogError("✗ WebGLビルド失敗：" + report.summary.result +
+                "\nWebGLモジュール未導入の可能性。Unity Hub → Installs → Add Modules → WebGL Build Support を確認してください。");
+    }
+
+    // ── GitHub Pages 公開用：リポジトリの docs/ へ直接ビルド ──
+    [MenuItem("Tools/おこめゲーム/GitHub Pages用にWebGLビルド（docs/へ出力）")]
+    static void BuildWebGLForPages()
+    {
+        // GitHub Pages は Brotli/Gzip を適切なヘッダで配信できないため圧縮を無効化
+        PlayerSettings.WebGL.compressionFormat = WebGLCompressionFormat.Disabled;
+
+        string projectRoot = System.IO.Path.GetFullPath(
+            System.IO.Path.Combine(Application.dataPath, ".."));
+        string docs = System.IO.Path.Combine(projectRoot, "docs");
+
+        var scenes = new List<string>();
+        foreach (var s in EditorBuildSettings.scenes)
+            if (s.enabled) scenes.Add(s.path);
+        if (scenes.Count == 0)
+            scenes.Add(UnityEditor.SceneManagement.EditorSceneManager.GetActiveScene().path);
+
+        var options = new BuildPlayerOptions
+        {
+            scenes           = scenes.ToArray(),
+            locationPathName = docs,
+            target           = BuildTarget.WebGL,
+            options          = BuildOptions.None
+        };
+
+        var report = BuildPipeline.BuildPlayer(options);
+        if (report.summary.result == UnityEditor.Build.Reporting.BuildResult.Succeeded)
+        {
+            // Jekyll処理を無効化（Unity出力をそのまま配信させる）
+            System.IO.File.WriteAllText(System.IO.Path.Combine(docs, ".nojekyll"), "");
+            Debug.Log("✓ docs/ へWebGLビルド成功。\n次の手順:\n" +
+                "1) git add docs && git commit -m \"Add WebGL build\" && git push\n" +
+                "2) GitHub → Settings → Pages → Source=Deploy from a branch, Branch=main /docs\n" +
+                "3) 数分後 https://yut122.github.io/Okome_Game/ で公開");
+        }
+        else
+            Debug.LogError("✗ ビルド失敗：" + report.summary.result +
                 "\nWebGLモジュール未導入の可能性。Unity Hub → Installs → Add Modules → WebGL Build Support を確認してください。");
     }
 
