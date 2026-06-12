@@ -86,12 +86,24 @@ public class OkomeUISetup : EditorWindow
             new Vector2(0, -20), new Vector2(600, 40),
             "～お米を見極めろ！～", 22, HexColor("#E8841A"), TextAlignmentOptions.Center);
 
-        // ── 「はじめる」ボタン ──
+        // ── 「はじめる」ボタン（年数選択を右に置くため少し左へ）──
         GameObject startBtn = CreateButton(titleScreen, "StartButton", "はじめる",
-            new Vector2(0, -140), new Vector2(260, 72));
-        // ボタンを大きめのフォントに
+            new Vector2(-150, -140), new Vector2(240, 74));
         var btnText = FindInChildren(startBtn, "Text")?.GetComponent<TextMeshProUGUI>();
         if (btnText != null) btnText.fontSize = 34;
+
+        // ── プレイ年数の選択（「はじめる」の横）──
+        CreateText(titleScreen, "YearSelectLabel",
+            new Vector2(190, -104), new Vector2(230, 30),
+            "プレイ年数", 18, HexColor("#3D2B1F"), TextAlignmentOptions.Center);
+        GameObject years3Btn = CreateButton(titleScreen, "Years3Button", "3年",
+            new Vector2(135, -150), new Vector2(95, 62));
+        GameObject years5Btn = CreateButton(titleScreen, "Years5Button", "5年",
+            new Vector2(245, -150), new Vector2(95, 62));
+        var y3t = FindInChildren(years3Btn, "Text")?.GetComponent<TextMeshProUGUI>();
+        if (y3t != null) y3t.fontSize = 26;
+        var y5t = FindInChildren(years5Btn, "Text")?.GetComponent<TextMeshProUGUI>();
+        if (y5t != null) y5t.fontSize = 26;
 
         // ── 自動配線 ──
         var sm = Object.FindObjectOfType<ScreenManager>();
@@ -104,6 +116,18 @@ public class OkomeUISetup : EditorWindow
 
             // StartButton → ScreenManager.ShowNews
             WireButton("StartButton", sm, "ShowNews");
+        }
+
+        // 年数選択ボタンを GameController に結線
+        var gcTitle = Object.FindObjectOfType<GameController>();
+        if (gcTitle != null)
+        {
+            var soGc = new SerializedObject(gcTitle);
+            SetField(soGc, "years3Button", years3Btn);
+            SetField(soGc, "years5Button", years5Btn);
+            soGc.ApplyModifiedProperties();
+            WireButton("Years3Button", gcTitle, "SelectYears3");
+            WireButton("Years5Button", gcTitle, "SelectYears5");
         }
 
         // GlobalTopBarはタイトル画面では非表示にする（Canvas最前面にあるため別途対応）

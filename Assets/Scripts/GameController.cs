@@ -49,6 +49,10 @@ public class GameController : MonoBehaviour
     public GameObject endingCelebrationGroup; // 成功時に表示（派手なお祝い）
     public GameObject endingSadGroup;         // 失敗時に表示（ザンネーン）
 
+    [Header("タイトル：プレイ年数選択")]
+    public GameObject years3Button;
+    public GameObject years5Button;
+
     // ── 内部状態 ────────────────────────────────
     int selectedIndex = -1;
     readonly List<(SupplierData supplier, int cost)> yearPurchases
@@ -144,7 +148,43 @@ public class GameController : MonoBehaviour
 
     void Awake() => money = initialMoney;
 
-    void Start() => InitYear();
+    void Start()
+    {
+        InitYear();
+        HighlightYearButtons(); // タイトルの年数選択の初期ハイライト（既定 maxDays）
+    }
+
+    // ── タイトル：プレイ年数の選択（3年 / 5年）──
+    public void SelectYears3() => SelectYears(3);
+    public void SelectYears5() => SelectYears(5);
+
+    public void SelectYears(int n)
+    {
+        maxDays = n;
+        HighlightYearButtons();
+    }
+
+    void HighlightYearButtons()
+    {
+        SetYearButton(years3Button, maxDays == 3);
+        SetYearButton(years5Button, maxDays == 5);
+    }
+
+    static void SetYearButton(GameObject btn, bool selected)
+    {
+        if (btn == null) return;
+        Color col = selected ? new Color(0.91f, 0.52f, 0.10f)   // 選択中：オレンジ
+                             : new Color(0.54f, 0.53f, 0.50f);  // 非選択：グレー
+        var img = btn.GetComponent<Image>();
+        if (img != null) img.color = Color.white; // 色はボタンのtintで表現
+        var b = btn.GetComponent<Button>();
+        if (b != null)
+        {
+            var c = b.colors;
+            c.normalColor = c.selectedColor = c.highlightedColor = c.pressedColor = col;
+            b.colors = c;
+        }
+    }
 
     void InitYear()
     {
