@@ -8,6 +8,9 @@ public class JudgeManager : MonoBehaviour
 
     private int currentIndex = 0;
 
+    // 現在の業者（読み取り専用）。
+    // ※以前は setter が suppliers[currentIndex] を上書きしており、
+    //   違反チェックのたびに業者リストを破壊していたため setter を撤去した。
     public SupplierData currentSupplier
     {
         get
@@ -15,11 +18,6 @@ public class JudgeManager : MonoBehaviour
             if (suppliers == null || suppliers.Count == 0) return null;
             if (currentIndex >= suppliers.Count) return null;
             return suppliers[currentIndex];
-        }
-        set
-        {
-            if (suppliers != null && currentIndex < suppliers.Count)
-                suppliers[currentIndex] = value;
         }
     }
 
@@ -44,17 +42,22 @@ public class JudgeManager : MonoBehaviour
         currentIndex = 0;
     }
 
-    public string CheckViolation()
-    {
-        if (currentSupplier == null) return "";
+    // 現在の業者を判定（後方互換用の引数なし版）
+    public string CheckViolation() => CheckViolation(currentSupplier);
 
-        if (currentSupplier.certOrigin == bannedOrigin)
+    // 指定した業者の違反内容を返す（違反がなければ空文字）。
+    // 状態を一切書き換えないため、任意の業者を安全に判定できる。
+    public string CheckViolation(SupplierData supplier)
+    {
+        if (supplier == null) return "";
+
+        if (!string.IsNullOrEmpty(bannedOrigin) && supplier.certOrigin == bannedOrigin)
             return $"{bannedOrigin}産は本日仕入れ禁止";
 
-        if (currentSupplier.claimedRiceName != currentSupplier.certRiceName)
-            return $"申告品種「{currentSupplier.claimedRiceName}」と証明書「{currentSupplier.certRiceName}」が一致しない";
+        if (supplier.claimedRiceName != supplier.certRiceName)
+            return $"申告品種「{supplier.claimedRiceName}」と証明書「{supplier.certRiceName}」が一致しない";
 
-        if (currentSupplier.registrationExpired)
+        if (supplier.registrationExpired)
             return "登録番号の有効期限が切れています";
 
         return "";

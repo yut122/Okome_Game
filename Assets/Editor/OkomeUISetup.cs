@@ -145,7 +145,7 @@ public class OkomeUISetup : EditorWindow
         // 在庫テキスト（中央右）
         CreateText(topBar, "GlobalStockText",
             new Vector2(220, 0), new Vector2(200, 50),
-            "在庫：0kg", 26, Color.white, TextAlignmentOptions.Center);
+            "在庫：0個", 26, Color.white, TextAlignmentOptions.Center);
 
         // HierarchyでCanvas内の最後（前面表示）に移動
         topBar.transform.SetAsLastSibling();
@@ -896,17 +896,11 @@ public class OkomeUISetup : EditorWindow
             CreatePanel(card, "Divider",
                 new Vector2(0, 54), new Vector2(280, 2), HexColor("#E8D0B0"));
 
-            // 価格
+            // 価格（仕入れは1クリックで1個に統一・数量「袋」表示は廃止）
             CreateText(card, "LabelPrice",
-                new Vector2(-72, 15), new Vector2(120, 32), "価格", 18, HexColor("#888888"), TextAlignmentOptions.Left);
+                new Vector2(-72, -3), new Vector2(120, 32), "価格", 18, HexColor("#888888"), TextAlignmentOptions.Left);
             CreateText(card, "PriceText",
-                new Vector2(58, 15), new Vector2(155, 32), "¥500/kg", 20, HexColor("#3D2B1F"), TextAlignmentOptions.Left);
-
-            // 数量
-            CreateText(card, "LabelVolume",
-                new Vector2(-72, -22), new Vector2(120, 32), "数量", 18, HexColor("#888888"), TextAlignmentOptions.Left);
-            CreateText(card, "VolumeText",
-                new Vector2(58, -22), new Vector2(155, 32), "30 kg", 20, HexColor("#3D2B1F"), TextAlignmentOptions.Left);
+                new Vector2(58, -3), new Vector2(160, 32), "¥280,000 / 個", 20, HexColor("#3D2B1F"), TextAlignmentOptions.Left);
 
             // 「選択中」バッジ（初期非表示）
             GameObject badge = CreatePanel(card, "SelectingBadge",
@@ -931,7 +925,7 @@ public class OkomeUISetup : EditorWindow
         sumOutline.effectDistance = new Vector2(2, -2);
         CreateText(summaryBg, "SummaryText",
             Vector2.zero, new Vector2(420, 80),
-            "コシノヒカル × 30kg\n合計：¥15,000", 19, HexColor("#3D2B1F"), TextAlignmentOptions.Center);
+            "コシノヒカル × 1 個\n合計：¥280,000", 19, HexColor("#3D2B1F"), TextAlignmentOptions.Center);
         summaryBg.SetActive(false);
 
         // ── 3ボタン横並び（中央揃え）──
@@ -1352,6 +1346,204 @@ public class OkomeUISetup : EditorWindow
         so.ApplyModifiedProperties();
 
         WireButton("NextDayButton", gc, "OnNextDayButton");
+    }
+
+    // ════════════════════════════════════════════════════════
+    // EndingScreen レイアウト + 配線（成功＝お祝い／失敗＝ザンネーン）
+    // ════════════════════════════════════════════════════════
+
+    [MenuItem("Tools/おこめゲーム/EndingScreenを構築して配線")]
+    static void BuildAndWireEndingScreen()
+    {
+        GameObject canvas = GameObject.Find("Canvas");
+        if (canvas == null) { Debug.LogError("Canvasが見つかりません"); return; }
+
+        GameObject ending = FindDeep("EndingScreen"); // 非アクティブでも検出（重複生成防止）
+        if (ending == null)
+        {
+            ending = new GameObject("EndingScreen", typeof(RectTransform), typeof(Image));
+            Undo.RegisterCreatedObjectUndo(ending, "Create EndingScreen");
+            ending.transform.SetParent(canvas.transform, false);
+            var ert = ending.GetComponent<RectTransform>();
+            ert.anchorMin = Vector2.zero; ert.anchorMax = Vector2.one;
+            ert.sizeDelta = Vector2.zero; ert.anchoredPosition = Vector2.zero;
+        }
+        else
+        {
+            while (ending.transform.childCount > 0)
+                Undo.DestroyObjectImmediate(ending.transform.GetChild(0).gameObject);
+        }
+        SetImageColor(ending, HexColor("#2A2620"));
+
+        // ── お祝い演出（成功時）──
+        GameObject celebrate = CreateGroup(ending, "CelebrationGroup");
+        CreatePanel(celebrate, "CelebBg",  Vector2.zero,      new Vector2(1300, 760), HexColor("#E8841A"));
+        CreatePanel(celebrate, "CelebTop", new Vector2(0,330),new Vector2(1300, 110), HexColor("#FFC94D"));
+        BuildConfetti(celebrate);
+        BuildTrophy(celebrate);
+        CreateText(celebrate, "CelebrateBanner",
+            new Vector2(0, 240), new Vector2(1100, 100),
+            "おめでとう！", 70, HexColor("#FFFFFF"), TextAlignmentOptions.Center);
+
+        // ── ザンネーン演出（失敗時）──
+        GameObject sad = CreateGroup(ending, "SadGroup");
+        CreatePanel(sad, "SadBg",     Vector2.zero,        new Vector2(1300, 760), HexColor("#3A4654"));
+        CreatePanel(sad, "SadGround", new Vector2(0,-330), new Vector2(1300, 120), HexColor("#2C3640"));
+        BuildRain(sad);
+        BuildDroop(sad);
+        CreateText(sad, "SadBanner",
+            new Vector2(0, 240), new Vector2(1100, 100),
+            "ザンネーン…", 70, HexColor("#9FB4C8"), TextAlignmentOptions.Center);
+
+        celebrate.SetActive(false);
+        sad.SetActive(false);
+
+        // ── 結果テキスト（両演出の前面・共通）──
+        GameObject resultPanel = CreatePanel(ending, "EndingResultPanel",
+            new Vector2(0, -30), new Vector2(640, 300), new Color(1f, 1f, 1f, 0.92f));
+        var rpOl = resultPanel.AddComponent<Outline>();
+        rpOl.effectColor = HexColor("#3D2B1F"); rpOl.effectDistance = new Vector2(3, -3);
+        CreateText(resultPanel, "EndingText",
+            Vector2.zero, new Vector2(600, 280),
+            "結果がここに表示されます", 27, HexColor("#3D2B1F"), TextAlignmentOptions.Center);
+
+        // ── 「もう一度」ボタン ──
+        CreateButton(ending, "RetryButton", "もう一度",
+            new Vector2(0, -255), new Vector2(220, 64));
+
+        // ── 配線 ──
+        var gc = Object.FindObjectOfType<GameController>();
+        var sm = Object.FindObjectOfType<ScreenManager>();
+        if (gc != null)
+        {
+            var so = new SerializedObject(gc);
+            SetField(so, "endingText",              FindInChildren(ending, "EndingText")?.GetComponent<TextMeshProUGUI>());
+            SetField(so, "endingCelebrationGroup",  celebrate);
+            SetField(so, "endingSadGroup",          sad);
+            so.ApplyModifiedProperties();
+            WireButton("RetryButton", gc, "RestartGame");
+        }
+        if (sm != null)
+        {
+            var soSm = new SerializedObject(sm);
+            SetField(soSm, "endingScreen", ending);
+            soSm.ApplyModifiedProperties();
+        }
+
+        ending.transform.SetAsLastSibling();
+        MarkDirtyAndLog("EndingScreen 構築+配線");
+    }
+
+    // 紙吹雪（ランダムな色・回転の小片）
+    static void BuildConfetti(GameObject parent)
+    {
+        string[] cols = { "#FF5D5D", "#FFD24D", "#5DD0FF", "#7DDB6B", "#FF8AD1", "#FFFFFF" };
+        var rnd = new System.Random(12345);
+        for (int i = 0; i < 40; i++)
+        {
+            float x = rnd.Next(-620, 620);
+            float y = rnd.Next(-110, 360);
+            var piece = CreatePanel(parent, "Confetti" + i,
+                new Vector2(x, y), new Vector2(16, 24), HexColor(cols[i % cols.Length]));
+            piece.GetComponent<RectTransform>().localRotation = Quaternion.Euler(0, 0, rnd.Next(0, 360));
+        }
+    }
+
+    // 金トロフィー
+    static void BuildTrophy(GameObject parent)
+    {
+        var cup = CreatePanel(parent, "TrophyCup", new Vector2(0, 70), new Vector2(130, 95), HexColor("#FFD24D"));
+        CreatePanel(cup, "HandleL", new Vector2(-78, 8), new Vector2(34, 56), HexColor("#FFC94D"));
+        CreatePanel(cup, "HandleR", new Vector2(78, 8),  new Vector2(34, 56), HexColor("#FFC94D"));
+        CreatePanel(parent, "TrophyStem", new Vector2(0, 8),   new Vector2(26, 40), HexColor("#E0A93A"));
+        CreatePanel(parent, "TrophyBase", new Vector2(0, -18), new Vector2(100, 20), HexColor("#C8902E"));
+    }
+
+    // 雨（斜めの細い線）
+    static void BuildRain(GameObject parent)
+    {
+        var rnd = new System.Random(54321);
+        for (int i = 0; i < 50; i++)
+        {
+            float x = rnd.Next(-620, 620);
+            float y = rnd.Next(-100, 360);
+            var drop = CreatePanel(parent, "Rain" + i,
+                new Vector2(x, y), new Vector2(3, 26), HexColor("#6E8AA6"));
+            drop.GetComponent<RectTransform>().localRotation = Quaternion.Euler(0, 0, 18);
+        }
+    }
+
+    // しょんぼり顔（涙つき）
+    static void BuildDroop(GameObject parent)
+    {
+        var face = CreatePanel(parent, "SadFace", new Vector2(0, 70), new Vector2(150, 150), HexColor("#D9C7A0"));
+        CreatePanel(face, "EyeL", new Vector2(-38, 22), new Vector2(20, 20), HexColor("#3A4654"));
+        CreatePanel(face, "EyeR", new Vector2(38, 22),  new Vector2(20, 20), HexColor("#3A4654"));
+        CreatePanel(face, "Tear", new Vector2(-38, -8), new Vector2(11, 30), HexColor("#6EC6FF"));
+        CreatePanel(face, "Mouth", new Vector2(0, -42), new Vector2(64, 10), HexColor("#3A4654"));
+    }
+
+    // ════════════════════════════════════════════════════════
+    // WebGL ビルド（ブラウザ向け書き出し）
+    // ════════════════════════════════════════════════════════
+
+    [MenuItem("Tools/おこめゲーム/WebGLビルド")]
+    static void BuildWebGL()
+    {
+        string folder = EditorUtility.SaveFolderPanel("WebGLビルドの出力先を選択", "", "OkomeGame_WebGL");
+        if (string.IsNullOrEmpty(folder)) { Debug.Log("ビルドをキャンセルしました"); return; }
+
+        var scenes = new List<string>();
+        foreach (var s in EditorBuildSettings.scenes)
+            if (s.enabled) scenes.Add(s.path);
+        if (scenes.Count == 0)
+            scenes.Add(UnityEditor.SceneManagement.EditorSceneManager.GetActiveScene().path);
+
+        var options = new BuildPlayerOptions
+        {
+            scenes           = scenes.ToArray(),
+            locationPathName = folder,
+            target           = BuildTarget.WebGL,
+            options          = BuildOptions.None
+        };
+
+        var report = BuildPipeline.BuildPlayer(options);
+        if (report.summary.result == UnityEditor.Build.Reporting.BuildResult.Succeeded)
+            Debug.Log("✓ WebGLビルド成功：" + folder + "\nローカルサーバで配信して index.html を開いてください。");
+        else
+            Debug.LogError("✗ WebGLビルド失敗：" + report.summary.result +
+                "\nWebGLモジュール未導入の可能性。Unity Hub → Installs → Add Modules → WebGL Build Support を確認してください。");
+    }
+
+    // ════════════════════════════════════════════════════════
+    // BuyScreen に「ニュースに戻る」ボタンを追加（左上・常時表示）
+    // 既存ボタンの配置は一切変更しない
+    // ════════════════════════════════════════════════════════
+
+    [MenuItem("Tools/おこめゲーム/BuyScreenに「ニュースに戻る」ボタンを追加")]
+    static void AddBackToNewsButton()
+    {
+        GameObject buyScreen = GameObject.Find("BuyScreen");
+        if (buyScreen == null) { Debug.LogError("BuyScreenが見つかりません"); return; }
+
+        // 既存があれば作り直し（重複防止）
+        GameObject existing = FindInChildren(buyScreen, "BackToNewsButton");
+        if (existing != null) Undo.DestroyObjectImmediate(existing);
+
+        // 左上に配置（タイトル左横・カードの上。他ボタンには干渉しない）
+        GameObject backBtn = CreateButton(buyScreen, "BackToNewsButton", "ニュースに戻る",
+            new Vector2(-545, 270), new Vector2(190, 52));
+        SetImageColor(backBtn, HexColor("#888888")); // 副ボタンらしくグレー
+        var t = FindInChildren(backBtn, "Text")?.GetComponent<TextMeshProUGUI>();
+        if (t != null) t.fontSize = 22;
+        backBtn.transform.SetAsLastSibling(); // 常に前面・表示のまま
+
+        // ScreenManager.ShowNews に配線
+        var sm = Object.FindObjectOfType<ScreenManager>();
+        if (sm != null) WireButton("BackToNewsButton", sm, "ShowNews");
+        else Debug.LogWarning("ScreenManagerが見つかりません。手動で配線してください。");
+
+        MarkDirtyAndLog("BuyScreenに「ニュースに戻る」ボタンを追加");
     }
 
     // ════════════════════════════════════════════════════════

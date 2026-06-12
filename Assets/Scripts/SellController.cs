@@ -51,6 +51,7 @@ public class SellController : MonoBehaviour
 
     int   totalSoldBags  = 0;
     int   totalRevenue = 0;
+    int   todayUnitPrice = 0; // 今年の1個あたり売値（平均仕入れ値×マークアップ）
 
     // ════════════════════════════════════════════════════════
     void OnEnable()
@@ -101,15 +102,17 @@ public class SellController : MonoBehaviour
         int   count   = CalculateCustomerCount();
         float chance  = CalculateBuyChance();
 
+        // 今年の売値：平均仕入れ値 × マークアップ（売り切れれば利益が出る）
+        int avgCost   = gameController.AverageUnitCost();
+        todayUnitPrice = Mathf.Max(1, Mathf.RoundToInt(avgCost * marketManager.SellMarkup));
+
         // ドットを来客数分だけ表示
         ShowDots(count);
 
-        int served = 0;
-
+        // 1人につき最大1個。完売したら即終了する。
         for (int i = 0; i < count; i++)
         {
-            if (gameController.stock <= 0) break;
-            served++;
+            if (gameController.stock <= 0) break; // 完売：即終了
             SetDot(i, "active");
 
             yield return StartCoroutine(CustomerAnimation(i, chance));
@@ -149,27 +152,27 @@ public class SellController : MonoBehaviour
         }
         yield return new WaitForSeconds(0.75f);
 
-        // ── 購入判定 ──
-        int actualBags = Mathf.Min(Random.Range(1, 4), gameController.stock);
+        // ── 購入判定（1人につき最大1個）──
+        int actualBags = Mathf.Min(1, gameController.stock);
         bool bought  = Random.value < buyChance && actualBags > 0;
 
         if (bought)
         {
-            int revenue   = actualBags * marketManager.TodaySellPrice;
+            int revenue   = actualBags * todayUnitPrice;
             totalSoldBags  += actualBags;
             totalRevenue += revenue;
             gameController.stock           -= actualBags;
             gameController.yearSellRevenue += revenue;
             gameController.UpdateUIPublic();
 
-            if (bubbleText) bubbleText.text = "購入！　" + actualBags + "袋";
+            if (bubbleText) bubbleText.text = "購入！　" + actualBags + "個";
             if (bubbleBg)   bubbleBg.color  = ColorBuy;
             SetDot(idx, "ok");
 
             if (runningTotalText)
                 runningTotalText.text =
                     "売上：¥" + totalRevenue.ToString("N0") +
-                    "　残在庫：" + gameController.stock + "袋";
+                    "　残在庫：" + gameController.stock + "個";
 
             // 袋を手に持つ
             SetActive(carryBagRT?.gameObject, true);
@@ -234,8 +237,7 @@ public class SellController : MonoBehaviour
         // 違反品を仕入れた場合は購入率が下がる
         foreach (var s in gameController.purchasedSuppliers)
         {
-            judgeManager.currentSupplier = s;
-            if (judgeManager.CheckViolation() != "") { c -= 0.15f; break; }
+            if (judgeManager.CheckViolation(s) != "") { c -= 0.15f; break; }
         }
         return Mathf.Clamp(c, 0.10f, 0.90f);
     }

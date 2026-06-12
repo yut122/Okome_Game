@@ -36,6 +36,12 @@ public class NewsController : MonoBehaviour
 
     void ShowPage()
     {
+        if (marketManager == null)
+        {
+            Debug.LogWarning("NewsController: marketManager が未設定です。Inspectorで割り当ててください。");
+            return;
+        }
+
         string title = "";
         string body  = "";
 

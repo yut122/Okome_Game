@@ -8,7 +8,8 @@ public class GameController : MonoBehaviour
     // ── パラメータ ──────────────────────────────
     public JudgeManager  judge;
     public MarketManager market;
-    public int money      = 10000000;
+    public int initialMoney = 10000000; // 初期資金1000万（Inspectorで調整可・全計算の基準）
+    public int money;                  // 実行時の所持金（initialMoneyから開始）
     public int stock      = 0;
     public int currentDay = 1;
     public int maxDays    = 5;
@@ -44,14 +45,55 @@ public class GameController : MonoBehaviour
     [Header("画面")]
     public ScreenManager screenManager;
 
+    [Header("エンディング演出")]
+    public GameObject endingCelebrationGroup; // 成功時に表示（派手なお祝い）
+    public GameObject endingSadGroup;         // 失敗時に表示（ザンネーン）
+
     // ── 内部状態 ────────────────────────────────
     int selectedIndex = -1;
     readonly List<(SupplierData supplier, int cost)> yearPurchases
         = new List<(SupplierData, int)>();
 
+    // 今年の各業者の仕入れ価格（judge.suppliers と同じ並び）。
+    // ScriptableObject資産を書き換えないよう、価格はここで保持する。
+    int[] currentPrices = new int[0];
+
+    // お米の「表示順（左→右）」と「基準価格（円）」。claimedRiceNameで対応付け。
+    static readonly (string rice, int basePrice)[] riceConfig =
+    {
+        ("ヤスノヒカリ", 400000),  // 約40万前後
+        ("ひとめほれ",  1000000),  // 約100万前後
+        ("あきたこひめ",1400000),  // 約140万前後
+    };
+
+    static int OrderIndex(SupplierData s)
+    {
+        if (s == null) return int.MaxValue;
+        for (int i = 0; i < riceConfig.Length; i++)
+            if (riceConfig[i].rice == s.claimedRiceName) return i;
+        return int.MaxValue; // 未知のお米は末尾
+    }
+
+    static int BasePriceOf(SupplierData s)
+    {
+        if (s != null)
+            foreach (var c in riceConfig)
+                if (c.rice == s.claimedRiceName) return c.basePrice;
+        return s != null ? s.pricePerBag : 0; // 未知のお米は資産の既定値
+    }
+
+    // 円を「万」表記へ（例: 200000 → "20万"）。
+    public static string ToMan(int yen)
+    {
+        if (yen % 10000 == 0) return (yen / 10000) + "万";
+        return (yen / 10000f).ToString("0.#") + "万";
+    }
+
     // ════════════════════════════════════════════
     // 初期化
     // ════════════════════════════════════════════
+
+    void Awake() => money = initialMoney;
 
     void Start() => InitYear();
 
@@ -63,9 +105,42 @@ public class GameController : MonoBehaviour
         yearPurchases.Clear();
 
         market.GenerateDailyMarket();
+        ReorderAndPriceSuppliers();
         UpdateUI();
         RefreshCards();
         UpdateBottomUI();
+    }
+
+    // 業者を表示順に並べ替え、今年の仕入れ価格を景気×収穫で算出する。
+    void ReorderAndPriceSuppliers()
+    {
+        if (judge == null || judge.suppliers == null) return;
+
+        // 1) 表示順（ヤスノヒカリ→ひとめほれ→あきたこひめ）に並べ替え
+        judge.suppliers.Sort((a, b) => OrderIndex(a).CompareTo(OrderIndex(b)));
+
+        // 2) 基準価格 × 仕入れ係数(景気・収穫) × 小さなランダム振れ で今年の価格を決定
+        float factor = market != null ? market.PurchaseFactor : 1f;
+        currentPrices = new int[judge.suppliers.Count];
+        for (int i = 0; i < judge.suppliers.Count; i++)
+        {
+            int   basePrice = BasePriceOf(judge.suppliers[i]);
+            float raw       = basePrice * factor * Random.Range(0.95f, 1.05f);
+            // 1万円単位に丸めて「○万」表記がきれいになるようにする
+            currentPrices[i] = Mathf.Max(10000, Mathf.RoundToInt(raw / 10000f) * 10000);
+        }
+    }
+
+    int PriceAt(int index)
+        => (index >= 0 && index < currentPrices.Length) ? currentPrices[index] : 0;
+
+    // 今年仕入れた1個あたりの平均仕入れ値（売値の基準に使う）
+    public int AverageUnitCost()
+    {
+        if (yearPurchases.Count == 0) return 0;
+        int sum = 0;
+        foreach (var p in yearPurchases) sum += p.cost;
+        return sum / yearPurchases.Count;
     }
 
     // ════════════════════════════════════════════
@@ -80,7 +155,7 @@ public class GameController : MonoBehaviour
             if (supplierCards[i] == null) continue;
             bool active = i < judge.suppliers.Count;
             supplierCards[i].gameObject.SetActive(active);
-            if (active) supplierCards[i].Setup(judge.suppliers[i], i, this);
+            if (active) supplierCards[i].Setup(judge.suppliers[i], i, this, PriceAt(i));
         }
     }
 
@@ -102,7 +177,7 @@ public class GameController : MonoBehaviour
     {
         if (selectedIndex < 0) return;
         var s    = judge.suppliers[selectedIndex];
-        int cost = s.pricePerBag; // 1回のBuyで1袋だけ仕入れる
+        int cost = PriceAt(selectedIndex); // 1回のBuyで1個だけ仕入れる
         if (money < cost) return;
 
         money -= cost;
@@ -151,8 +226,7 @@ public class GameController : MonoBehaviour
 
         if (hasSelection && selectedIndex < judge.suppliers.Count)
         {
-            var s  = judge.suppliers[selectedIndex];
-            canAfford = money >= s.pricePerBag;
+            canAfford = money >= PriceAt(selectedIndex);
         }
 
         SetActive(buyButton,   hasSelection && canAfford);
@@ -179,10 +253,10 @@ public class GameController : MonoBehaviour
         var sb = new System.Text.StringBuilder();
         foreach (var kv in dict)
         {
-            sb.Append(kv.Key).Append(" × ").Append(kv.Value.bags).Append("袋\n");
+            sb.Append(kv.Key).Append(" × ").Append(kv.Value.bags).Append("個\n");
             total += kv.Value.cost;
         }
-        sb.Append("合計：¥").Append(total.ToString("N0"));
+        sb.Append("合計：¥").Append(ToMan(total));
         return sb.ToString();
     }
 
@@ -193,7 +267,7 @@ public class GameController : MonoBehaviour
     void UpdateUI()
     {
         if (moneyText != null) moneyText.text = "所持金：¥" + money.ToString("N0");
-        if (stockText != null) stockText.text = "在庫：" + stock + "袋";
+        if (stockText != null) stockText.text = "在庫：" + stock + "個";
         if (dayText   != null) dayText.text   = currentDay + "年目";
     }
 
@@ -222,22 +296,36 @@ public class GameController : MonoBehaviour
 
     void ShowEnding()
     {
-        int totalProfit = money - 100000; // 初期資金との差
+        int totalProfit = money - initialMoney; // 初期資金（1000万）との差
         string trend    = totalProfit >= 0 ? "+" : "";
+        bool   success  = money >= initialMoney; // 1000万を基準に成功判定
+
         string msg =
             "【5年間の経営結果】\n\n" +
             "最終所持金：¥" + money.ToString("N0") + "\n" +
             "初期資金比：" + trend + totalProfit.ToString("N0") + "円\n\n";
 
-        if (money >= 200000)
-            msg += "【大成功】\nあなたは優れた米商人として街中に名を広めました。";
-        else if (money >= 100000)
-            msg += "【堅実経営】\n5年間、着実に経営を続けました。";
+        if (money >= initialMoney * 2)
+            msg += "★☆ 大 成 功 ☆★\nあなたは伝説の米商人だ！街中が祝福しています！";
+        else if (success)
+            msg += "『 成 功 』\n見事な経営でした。元手を増やしましたね！";
         else
-            msg += "【苦しい経営】\n厳しい5年間でした。来年こそは。";
+            msg += "… ザ ン ネ ー ン …\n惜しくも元手割れ。次こそリベンジだ！";
 
-        if (endingText    != null) endingText.text = msg;
+        if (endingText != null) endingText.text = msg;
+
+        // 成功＝派手にお祝い、失敗＝しょんぼり演出を切り替え
+        if (endingCelebrationGroup != null) endingCelebrationGroup.SetActive(success);
+        if (endingSadGroup         != null) endingSadGroup.SetActive(!success);
+
         if (screenManager != null) screenManager.ShowEnding();
+    }
+
+    // エンディングの「もう一度」ボタンから呼ぶ：最初からやり直す
+    public void RestartGame()
+    {
+        var scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
+        UnityEngine.SceneManagement.SceneManager.LoadScene(scene.buildIndex);
     }
 
     // ════════════════════════════════════════════
@@ -262,6 +350,13 @@ public class GameController : MonoBehaviour
             "　売　　上\n" +
             "\n" +
             "　" + profitLabel;
+
+        // 損益に応じた一言（利益→褒め言葉／損失→励まし）
+        string comment;
+        if      (netProfit > 0) comment = "お見事！今年はしっかり儲けが出たね。";
+        else if (netProfit < 0) comment = "今年は赤字…でも大丈夫、次こそ巻き返そう！";
+        else                    comment = "ちょうどトントン。次は利益を狙っていこう。";
+        labels += "\n\n" + comment;
 
         if (currentDay >= maxDays) labels += "\n\n「つぎへ」でエンディングへ";
 
