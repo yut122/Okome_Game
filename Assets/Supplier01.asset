@@ -14,10 +14,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::SupplierData
   supplierName: "\u7530\u4E2D\u8FB2\u5834"
   dialogue: "\u3046\u3061\u306E\u7C73\u306F\u81EA\u6162\u306E\u54C1\u3067\u3059\u3002\u3069\u3046\u305E\u3088\u308D\u3057\u304F\uFF01"
-  claimedRiceName: "\u3042\u304D\u305F\u3053\u3072\u3081"
+  claimedRiceName: "あまひかり"
   pricePerBag: 280000
   bagCount: 6
-  certRiceName: "\u3042\u304D\u305F\u3053\u3072\u3081"
+  certRiceName: "あまひかり"
   certOrigin: "\u5357\u90E8\u5730\u533A"
   certRegistrationNumber: A-2024-001
   registrationExpired: 0

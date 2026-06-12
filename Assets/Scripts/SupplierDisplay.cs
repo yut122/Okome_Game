@@ -28,7 +28,7 @@ public class SupplierDisplay : MonoBehaviour
         if (certRegistrationText != null) certRegistrationText.text = supplier.certRegistrationNumber;
         if (registrationStatusText != null)
             registrationStatusText.text = supplier.registrationExpired ? "期限切れ" : "有効";
-        if (priceText != null) priceText.text = "¥" + supplier.pricePerBag.ToString("N0") + " / 個";
+        if (priceText != null) priceText.text = GameController.ManYen(supplier.pricePerBag) + " / 個";
         if (volumeText != null) volumeText.text = supplier.bagCount + " 個";
     }
 }

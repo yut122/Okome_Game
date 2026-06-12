@@ -140,7 +140,7 @@ public class OkomeUISetup : EditorWindow
         // 所持金テキスト（中央左）
         CreateText(topBar, "GlobalMoneyText",
             new Vector2(-100, 0), new Vector2(280, 50),
-            "所持金：¥100,000", 26, Color.white, TextAlignmentOptions.Center);
+            "所持金：1000万円", 26, Color.white, TextAlignmentOptions.Center);
 
         // 在庫テキスト（中央右）
         CreateText(topBar, "GlobalStockText",
@@ -434,6 +434,9 @@ public class OkomeUISetup : EditorWindow
 
         Undo.RecordObject(btn, "Wire Button " + buttonName);
         btn.onClick.RemoveAllListeners();
+        // 永続リスナー（Inspectorに登録されるOnClick）も全削除して重複配線を防ぐ
+        for (int i = btn.onClick.GetPersistentEventCount() - 1; i >= 0; i--)
+            UnityEventTools.RemovePersistentListener(btn.onClick, i);
 
         var method = target.GetType().GetMethod(methodName);
         if (method == null) { Debug.LogWarning("メソッドが見つかりません: " + methodName); return; }
@@ -459,10 +462,10 @@ public class OkomeUISetup : EditorWindow
         SetSupplier("Supplier01",
             supplierName:        "田中農場",
             dialogue:            "うちの米は自慢の品です。どうぞよろしく！",
-            claimedRiceName:     "あきたこひめ",
-            pricePerBag:         280000,
+            claimedRiceName:     "あまひかり",
+            pricePerBag:         1400000,
             bagCount:            6,
-            certRiceName:        "あきたこひめ",
+            certRiceName:        "あまひかり",
             certOrigin:          "南部地区",
             certRegistrationNumber: "A-2024-001",
             registrationExpired: false);
@@ -470,10 +473,10 @@ public class OkomeUISetup : EditorWindow
         SetSupplier("Supplier02",
             supplierName:        "丸山米穀",
             dialogue:            "今日は特別価格でご提供します！お得ですよ！",
-            claimedRiceName:     "ひとめほれ",
-            pricePerBag:         200000,
+            claimedRiceName:     "春小町",
+            pricePerBag:         1000000,
             bagCount:            10,
-            certRiceName:        "ひとめほれ",
+            certRiceName:        "春小町",
             certOrigin:          "西部地区",
             certRegistrationNumber: "B-2024-015",
             registrationExpired: false);
@@ -481,15 +484,15 @@ public class OkomeUISetup : EditorWindow
         SetSupplier("Supplier03",
             supplierName:        "佐藤商店",
             dialogue:            "品質には自信があります。ぜひご検討を。",
-            claimedRiceName:     "ヤスノヒカリ",
-            pricePerBag:         140000,
+            claimedRiceName:     "カリカリ米",
+            pricePerBag:         400000,
             bagCount:            12,
-            certRiceName:        "ヤスノヒカリ",
+            certRiceName:        "カリカリ米",
             certOrigin:          "東部地区",
             certRegistrationNumber: "C-2024-008",
             registrationExpired: false);
 
-        Debug.Log("✓ 業者データを初期設定しました（初期フェーズ：全業者 正規品）。\n田中農場 あきたこひめ¥280,000/袋 / 丸山米穀 ひとめほれ¥200,000/袋 / 佐藤商店 ヤスノヒカリ¥140,000/袋");
+        Debug.Log("✓ 業者データを初期設定しました（初期フェーズ：全業者 正規品）。\n田中農場 あまひかり(A) / 丸山米穀 春小町(C) / 佐藤商店 カリカリ米(D)");
     }
 
     static void SetSupplier(string assetName, string supplierName, string dialogue,
@@ -881,33 +884,54 @@ public class OkomeUISetup : EditorWindow
             outline.effectDistance = new Vector2(4, -4);
             border.SetActive(false);
 
-            // ヘッダー（お米の名前）
+            // ── ヘッダー（お米の名前）──
             CreatePanel(card, "CardHeader",
-                new Vector2(0, 143), new Vector2(310, 48), HexColor("#E8841A"));
+                new Vector2(0, 150), new Vector2(310, 44), HexColor("#E8841A"));
             CreateText(card, "RiceNameText",
-                new Vector2(0, 143), new Vector2(300, 44),
-                "〇〇", 26, Color.white, TextAlignmentOptions.Center);
+                new Vector2(0, 150), new Vector2(300, 40),
+                "〇〇", 25, Color.white, TextAlignmentOptions.Center);
 
-            // 業者名（ヘッダーの下に小さく表示）
+            // 業者名（小さく）
             CreateText(card, "SupplierNameText",
-                new Vector2(0, 84), new Vector2(290, 32),
-                "業者名", 18, HexColor("#888888"), TextAlignmentOptions.Center);
+                new Vector2(0, 114), new Vector2(290, 26),
+                "業者名", 15, HexColor("#888888"), TextAlignmentOptions.Center);
 
             CreatePanel(card, "Divider",
-                new Vector2(0, 54), new Vector2(280, 2), HexColor("#E8D0B0"));
+                new Vector2(0, 94), new Vector2(286, 2), HexColor("#E8D0B0"));
 
-            // 価格（仕入れは1クリックで1個に統一・数量「袋」表示は廃止）
-            CreateText(card, "LabelPrice",
-                new Vector2(-72, -3), new Vector2(120, 32), "価格", 18, HexColor("#888888"), TextAlignmentOptions.Left);
-            CreateText(card, "PriceText",
-                new Vector2(58, -3), new Vector2(160, 32), "¥280,000 / 個", 20, HexColor("#3D2B1F"), TextAlignmentOptions.Left);
+            // ── 米ランク ──
+            CreateText(card, "LabelRank",
+                new Vector2(-80, 64), new Vector2(120, 26), "米ランク", 15, HexColor("#888888"), TextAlignmentOptions.Left);
+            CreateText(card, "RankText",
+                new Vector2(60, 64), new Vector2(150, 32), "A", 23, HexColor("#3FA34D"), TextAlignmentOptions.Left);
 
-            // 「選択中」バッジ（初期非表示）
+            // ── 流通期限 ──
+            CreateText(card, "LabelExpiry",
+                new Vector2(-80, 28), new Vector2(120, 26), "流通期限", 15, HexColor("#888888"), TextAlignmentOptions.Left);
+            CreateText(card, "ExpiryText",
+                new Vector2(58, 28), new Vector2(180, 26), "2002年4月まで", 15, HexColor("#3D2B1F"), TextAlignmentOptions.Left);
+
+            // 「選択中」バッジ（初期非表示・値札の上）
             GameObject badge = CreatePanel(card, "SelectingBadge",
-                new Vector2(0, -118), new Vector2(200, 40), HexColor("#E8841A"));
+                new Vector2(0, -26), new Vector2(200, 32), HexColor("#E8841A"));
             CreateText(badge, "SelectingLabel",
-                Vector2.zero, new Vector2(190, 36), "選択中", 20, Color.white, TextAlignmentOptions.Center);
+                Vector2.zero, new Vector2(190, 30), "選択中", 17, Color.white, TextAlignmentOptions.Center);
             badge.SetActive(false);
+
+            // ── 価格（値札スタイル：白い札＋ドロップシャドウ＋右の折り返し、価格はオレンジ太字）──
+            // カード下部に配置。折り返し（右の三角）は札の後ろに描画されるよう先に生成
+            GameObject fold = CreatePanel(card, "TagFold",
+                new Vector2(104, -110), new Vector2(46, 46), HexColor("#CFCFCF"));
+            fold.GetComponent<RectTransform>().localRotation = Quaternion.Euler(0, 0, 45);
+            // 白い値札本体
+            GameObject tag = CreatePanel(card, "PriceTag",
+                new Vector2(-6, -110), new Vector2(238, 92), Color.white);
+            var tagShadow = tag.AddComponent<Shadow>();
+            tagShadow.effectColor    = new Color(0f, 0f, 0f, 0.25f);
+            tagShadow.effectDistance = new Vector2(3, -4);
+            CreateText(tag, "PriceText",
+                new Vector2(0, 0), new Vector2(220, 74),
+                "<b>40</b><size=58%>万</size>", 40, HexColor("#E8841A"), TextAlignmentOptions.Center);
         }
 
         // ══════════════════════════════════════════
@@ -951,10 +975,17 @@ public class OkomeUISetup : EditorWindow
         sellBtn.SetActive(false);
 
         Selection.activeGameObject = buyScreen;
+
+        // レイアウト後そのまま自動配線（カードのランク・流通期限なども結線）
+        RewireBuyScreen();
+
+        // 「ニュースに戻る」ボタンも再生成（レイアウト再構築で消えないよう一緒に作る）
+        AddBackToNewsButton();
+
         UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(
             UnityEditor.SceneManagement.EditorSceneManager.GetActiveScene());
 
-        Debug.Log("✓ BuyScreen構築完了！\n\n【Inspector設定】\nGameController:\n  Supplier Cards[0~2] → SupplierCard0~2\n  Summary Text → SummaryBg内のSummaryText\n  Buy Button → BuyButton\n  Reset Button → ResetButton\n  Sell Button → SellButton\n\n各SupplierCardUI:\n  Card Background → カードのImage\n  Selected Border → SelectedBorder\n  Selecting Badge → SelectingBadge\n  Game Controller → GameManager\n\nボタンOnClick:\n  BuyButton → GameController.OnBuyButton\n  ResetButton → GameController.OnResetButton\n  SellButton → GameController.OnSellButton\n  各カード(Button) → SupplierCardUI.OnCardClicked");
+        Debug.Log("✓ BuyScreen構築＋自動配線が完了しました（価格を強調・米ランク/流通期限・ニュースに戻るボタンつき）。");
     }
 
     // ════════════════════════════════════════════════════════
@@ -1666,6 +1697,8 @@ public class OkomeUISetup : EditorWindow
             SetField(cso, "supplierNameText", FindInChildrenTMP(cards[i], "SupplierNameText"));
             SetField(cso, "riceNameText",    FindInChildrenTMP(cards[i], "RiceNameText"));
             SetField(cso, "priceText",       FindInChildrenTMP(cards[i], "PriceText"));
+            SetField(cso, "rankText",        FindInChildrenTMP(cards[i], "RankText"));
+            SetField(cso, "expiryText",      FindInChildrenTMP(cards[i], "ExpiryText"));
             SetField(cso, "volumeText",      FindInChildrenTMP(cards[i], "VolumeText"));
             cso.ApplyModifiedProperties();
 

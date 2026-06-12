@@ -83,7 +83,7 @@ public class SellController : MonoBehaviour
     void UpdateRiceBagNames()
     {
         if (riceBagNameTexts == null) return;
-        string name = "ヤスノヒカリ";
+        string name = "カリカリ米";
         if (gameController.purchasedSuppliers != null &&
             gameController.purchasedSuppliers.Count > 0)
             name = gameController.purchasedSuppliers[0].claimedRiceName;
@@ -103,13 +103,18 @@ public class SellController : MonoBehaviour
         float chance  = CalculateBuyChance();
 
         // 今年の売値：平均仕入れ値 × マークアップ（売り切れれば利益が出る）
+        // 1万円単位に丸めて、所持金が常に「◯◯万円」できれいに表示されるようにする
         int avgCost   = gameController.AverageUnitCost();
-        todayUnitPrice = Mathf.Max(1, Mathf.RoundToInt(avgCost * marketManager.SellMarkup));
+        float rawSell = avgCost * marketManager.SellMarkup;
+        todayUnitPrice = Mathf.Max(10000, Mathf.RoundToInt(rawSell / 10000f) * 10000);
+
+        // 来客ゲージ（ドット）の上限を超えない範囲に揃える
+        if (progressDots != null && count > progressDots.Length) count = progressDots.Length;
 
         // ドットを来客数分だけ表示
         ShowDots(count);
 
-        // 1人につき最大1個。完売したら即終了する。
+        // 1人につき最大1個。完売したら即終了（在庫管理はプレイヤーの責任）。
         for (int i = 0; i < count; i++)
         {
             if (gameController.stock <= 0) break; // 完売：即終了
@@ -171,7 +176,7 @@ public class SellController : MonoBehaviour
 
             if (runningTotalText)
                 runningTotalText.text =
-                    "売上：¥" + totalRevenue.ToString("N0") +
+                    "売上：" + GameController.ManYen(totalRevenue) +
                     "　残在庫：" + gameController.stock + "個";
 
             // 袋を手に持つ
@@ -215,13 +220,10 @@ public class SellController : MonoBehaviour
     // ════════════════════════════════════════════════════════
     int CalculateCustomerCount()
     {
-        int n = 5;
-        if      (marketManager.EconomyName.Contains("良い")) n += 3;
-        else if (marketManager.EconomyName.Contains("悪い")) n -= 2;
-        if      (marketManager.HarvestName.Contains("不作")) n -= 1;
-        else if (marketManager.HarvestName.Contains("豊作")) n += 1;
-        n += Random.Range(-2, 3);
-        return Mathf.Clamp(n, 1, 12);
+        // 景気で来客数のレンジが変わる（低5〜7／中8〜10／好11〜12・上限12）
+        if      (marketManager.EconomyName.Contains("良い")) return Random.Range(11, 13); // 11〜12
+        else if (marketManager.EconomyName.Contains("悪い")) return Random.Range(5, 8);   // 5〜7
+        else                                                 return Random.Range(8, 11);  // 8〜10
     }
 
     float CalculateBuyChance()
@@ -239,7 +241,11 @@ public class SellController : MonoBehaviour
         {
             if (judgeManager.CheckViolation(s) != "") { c -= 0.15f; break; }
         }
-        return Mathf.Clamp(c, 0.10f, 0.90f);
+
+        // 転売屋（アヤシイ商店）から仕入れていると購入率が大きく下がる
+        if (gameController.BoughtFromReseller()) c -= 0.45f;
+
+        return Mathf.Clamp(c, 0.05f, 0.90f);
     }
 
     // ════════════════════════════════════════════════════════
