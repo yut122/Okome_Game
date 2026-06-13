@@ -53,6 +53,11 @@ public class SellController : MonoBehaviour
     int   totalRevenue = 0;
     int   todayUnitPrice = 0; // 今年の1個あたり売値（平均仕入れ値×マークアップ）
 
+    // 来客ゲージ（ドット）のスライドイン用
+    Vector2[]   dotHomePos;          // 各ドットの定位置
+    bool        dotHomeCaptured;     // 定位置を記録済みか
+    const float DOT_ENTER_X = 360f;  // ドットがスライドインを始める右側のX
+
     // ════════════════════════════════════════════════════════
     void OnEnable()
     {
@@ -69,7 +74,8 @@ public class SellController : MonoBehaviour
         // お米袋の名前を購入済み品種名に設定
         UpdateRiceBagNames();
 
-        // ドットをすべて非表示に
+        // 各ドットの定位置を記録してから、すべて非表示に
+        CaptureDotHomes();
         HideAllDots();
 
         StartCoroutine(SellPhaseCoroutine());
@@ -111,14 +117,13 @@ public class SellController : MonoBehaviour
         // 来客ゲージ（ドット）の上限を超えない範囲に揃える
         if (progressDots != null && count > progressDots.Length) count = progressDots.Length;
 
-        // ドットを来客数分だけ表示
-        ShowDots(count);
-
         // 1人につき最大1個。完売したら即終了（在庫管理はプレイヤーの責任）。
         for (int i = 0; i < count; i++)
         {
             if (gameController.stock <= 0) break; // 完売：即終了
-            SetDot(i, "active");
+
+            // 客の来店に合わせて、ドットも右からスライドインして追加（並行再生）
+            StartCoroutine(SlideInDot(i));
 
             yield return StartCoroutine(CustomerAnimation(i, chance));
 
@@ -251,6 +256,42 @@ public class SellController : MonoBehaviour
     // ════════════════════════════════════════════════════════
     // ドット管理
     // ════════════════════════════════════════════════════════
+
+    // 各ドットの定位置（ビルド時の配置）を一度だけ記録する
+    void CaptureDotHomes()
+    {
+        if (dotHomeCaptured || progressDots == null) return;
+        dotHomePos = new Vector2[progressDots.Length];
+        for (int i = 0; i < progressDots.Length; i++)
+            if (progressDots[i] != null)
+                dotHomePos[i] = progressDots[i].rectTransform.anchoredPosition;
+        dotHomeCaptured = true;
+    }
+
+    // 1個のドットを右からスライドインさせて定位置に追加する
+    IEnumerator SlideInDot(int idx)
+    {
+        if (progressDots == null || idx >= progressDots.Length || progressDots[idx] == null) yield break;
+        if (dotHomePos == null || idx >= dotHomePos.Length) yield break;
+
+        var rt   = progressDots[idx].rectTransform;
+        Vector2 home  = dotHomePos[idx];
+        Vector2 start = new Vector2(DOT_ENTER_X, home.y);
+
+        progressDots[idx].gameObject.SetActive(true);
+        progressDots[idx].color = ColorDotActive; // 来店中の色
+        rt.anchoredPosition = start;
+
+        float t = 0f, dur = 0.6f;
+        while (t < dur)
+        {
+            t += Time.deltaTime;
+            rt.anchoredPosition = Vector2.Lerp(start, home, t / dur);
+            yield return null;
+        }
+        rt.anchoredPosition = home;
+    }
+
     void HideAllDots()
     {
         if (progressDots == null) return;

@@ -411,25 +411,29 @@ public class GameController : MonoBehaviour
     {
         int totalProfit = money - initialMoney; // 初期資金（1000万）との差
         string trend    = totalProfit >= 0 ? "+" : "-";
-        bool   success  = money >= initialMoney; // 1000万を基準に成功判定
+
+        // 3段階：1500万以上＝大成功 / 1000万〜1500万未満＝ぼちぼち / 1000万未満＝ザンネーン
+        bool celebrate = money >= initialMoney * 3 / 2; // 1500万以上
+        bool decent    = !celebrate && money >= initialMoney; // 1000万〜1500万未満
+        bool loss      = money < initialMoney;            // 1000万未満
 
         string msg =
             "【5年間の経営結果】\n\n" +
             "最終所持金：" + ManYen(money) + "\n" +
             "初期資金比：" + trend + ManYen(Mathf.Abs(totalProfit)) + "\n\n";
 
-        if (money >= initialMoney * 2)
+        if (celebrate)
             msg += "★☆ 大 成 功 ☆★\nあなたは伝説の米商人だ！街中が祝福しています！";
-        else if (success)
-            msg += "『 成 功 』\n見事な経営でした。元手を増やしましたね！";
+        else if (decent)
+            msg += "『 ぼちぼち 』\nぼちぼちの結果だね。まだまだいけるよ！";
         else
             msg += "… ザ ン ネ ー ン …\n惜しくも元手割れ。次こそリベンジだ！";
 
         if (endingText != null) endingText.text = msg;
 
-        // 成功＝派手にお祝い、失敗＝しょんぼり演出を切り替え
-        if (endingCelebrationGroup != null) endingCelebrationGroup.SetActive(success);
-        if (endingSadGroup         != null) endingSadGroup.SetActive(!success);
+        // 演出：大成功のみ派手にお祝い、赤字のみしょんぼり、ぼちぼちは中立（どちらも非表示）
+        if (endingCelebrationGroup != null) endingCelebrationGroup.SetActive(celebrate);
+        if (endingSadGroup         != null) endingSadGroup.SetActive(loss);
 
         if (screenManager != null) screenManager.ShowEnding();
     }
